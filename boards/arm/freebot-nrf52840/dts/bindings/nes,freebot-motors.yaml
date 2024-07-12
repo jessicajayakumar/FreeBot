@@ -1,0 +1,20 @@
+description: Motors for FreeBot
+compatible: "nes,freebot-motors"
+
+child-binding:
+    description: A FreeBot motor
+    properties:
+        label:
+            type: string
+        in-a-gpios:
+            type: phandle-array
+            required: true
+        in-b-gpios:
+            type: phandle-array
+            required: true
+        hall-c1-gpios:
+            type: phandle-array
+            required: true
+        hall-c2-gpios:
+            type: phandle-array
+            required: true
