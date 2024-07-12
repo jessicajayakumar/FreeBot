@@ -1,0 +1,20 @@
+description: Power management for FreeBot
+compatible: "nes,freebot-powermanagement"
+properties:
+    label:
+        type: string
+    io-channels:
+        type: phandle-array
+        required: true
+    vin-measure-enable-gpios:
+        type: phandle-array
+        required: true
+    vcap-measure-enable-gpios:
+        type: phandle-array
+        required: true
+    vmotor-measure-enable-gpios:
+        type: phandle-array
+        required: true
+    vout-enable-gpios:
+        type: phandle-array
+        required: true
