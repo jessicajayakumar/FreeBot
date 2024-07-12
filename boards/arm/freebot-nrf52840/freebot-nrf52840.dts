@@ -1,0 +1,213 @@
+// Copyright (c) 2024 Nordic Semiconductor ASA
+// SPDX-License-Identifier: Apache-2.0
+
+/dts-v1/;
+#include <nordic/nrf52840_qiaa.dtsi>
+
+/ {
+    model = "FreeBot";
+    compatible = "nes,freebot-nrf52840";
+
+    chosen {
+        zephyr,console = &uart0;
+        zephyr,shell-uart = &uart0;
+        zephyr,sram = &sram0;
+        zephyr,flash = &flash0;
+        zephyr,code-partition = &slot0_partition;
+    };
+
+    leds {
+        compatible = "gpio-leds";
+        d15: led_0 {
+            gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+        };
+        d16: led_1 {
+            gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+        };
+    };
+
+    buttons {
+        compatible = "gpio-keys";
+        sw2: button_0 {
+            gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+            label = "SW2";
+            zephyr,code = <INPUT_KEY_0>;
+        };
+    };
+
+    motors {
+        compatible = "nes,freebot-motors";
+        m1: motor1 {
+            in-a-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+            in-b-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+            hall-c1-gpios = <&gpio1 4 0>;
+            hall-c2-gpios = <&gpio1 6 0>;
+        };
+        m2: motor2 {
+            in-a-gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+            in-b-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+            hall-c1-gpios = <&gpio0 20 0>;
+            hall-c2-gpios = <&gpio0 22 0>;
+        };
+        m3: motor3 {
+            in-a-gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
+            in-b-gpios = <&gpio1 11 GPIO_ACTIVE_HIGH>;
+            hall-c1-gpios = <&gpio0 2 0>;
+            hall-c2-gpios = <&gpio0 3 0>;
+        };
+        m4: motor4 {
+            in-a-gpios = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+            in-b-gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+            hall-c1-gpios = <&gpio0 28 0>;
+            hall-c2-gpios = <&gpio0 29 0>;
+        };
+    };
+
+    freebotpwr {
+        compatible = "nes,freebot-powermanagement";
+        io-channels = <&adc 3>;
+        vin-measure-enable-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+        vcap-measure-enable-gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+        vmotor-measure-enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+        vout-enable-gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+    };
+};
+
+&gpiote {
+    status = "okay";
+};
+
+&gpio0 {
+    status = "okay";
+};
+
+&gpio1 {
+    status = "okay";
+};
+
+&adc {
+    #address-cells = <1>;
+    #size-cells = <0>;
+    status = "okay";
+
+    channel@3 {
+        reg = <3>;
+        zephyr,gain = "ADC_GAIN_4"; /* nRF52840 DOCS: ΔVmeasure = Vref / GAIN */
+        zephyr,reference = "ADC_REF_INTERNAL"; /* nRF52840 DOCS: Internal Vref = 600mV */
+        zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>; /* nRF52840 DOCS: input R > 400k => 40ms */
+        zephyr,input-positive = <NRF_SAADC_AIN3>; /* P0.05 */
+        zephyr,resolution = <14>;
+    };
+
+};
+
+&uart0 {
+    compatible = "nordic,nrf-uarte";
+    status = "okay";
+    current-speed = <115200>;
+    pinctrl-0 = <&uart0_default>;
+    pinctrl-1 = <&uart0_sleep>;
+    pinctrl-names = "default", "sleep";
+};
+
+&spi0 {
+    compatible = "nordic,nrf-spi";
+    status = "okay";
+    pinctrl-0 = <&spi0_default>;
+    pinctrl-1 = <&spi0_sleep>;
+    pinctrl-names = "default", "sleep";
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        boot_partition: partition@0 {
+            label = "mcuboot";
+            reg = <0x0 0xc000>;
+        };
+        slot0_partition: partition@c000 {
+            label = "image-0";
+            reg = <0xc000 0x72000>;
+        };
+        slot1_partition: partition@7e000 {
+            label = "image-1";
+            reg = <0x7e000 0x72000>;
+        };
+        scratch_partition: partition@f0000 {
+            label = "image-scratch";
+            reg = <0xf0000 0xa000>;
+        };
+        storage_partition: partition@fa000 {
+            label = "storage";
+            reg = <0xfa000 0x6000>;
+        };
+    };
+};
+
+&pinctrl {
+    uart0_default: uart0_default {
+        group1 {
+            // psels = <NRF_PSEL(UART_RX, 0, 13)>;
+            psels = <NRF_PSEL(UART_RX, 0, 24)>;
+            bias-pull-up;
+        };
+        group2 {
+            // psels = <NRF_PSEL(UART_TX, 0, 24)>;
+            psels = <NRF_PSEL(UART_TX, 0, 13)>;
+        };
+    };
+    uart0_sleep: uart0_sleep {
+        group1 {
+            psels = <NRF_PSEL(UART_RX, 0, 13)>,
+                    <NRF_PSEL(UART_TX, 0, 24)>;
+            low-power-enable;
+        };
+    };
+
+    spi0_default: spi0_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 6)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 4)>,
+                    <NRF_PSEL(SPIM_MISO, 0, 8)>;
+        };
+    };
+    spi0_sleep: spi0_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 6)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 4)>,
+                    <NRF_PSEL(SPIM_MISO, 0, 8)>;
+            low-power-enable;
+        };
+    };
+};
+
+&nfct {
+	status = "disabled";
+};
+
+&power {
+	status = "disabled";
+};
+
+&temp {
+	status = "disabled";
+};
+
+// &cryptocell {
+// 	status = "disabled";
+// };
+
+&ecb {
+	status = "disabled";
+};
+
+&ccm {
+	status = "disabled";
+};
+
+&acl {
+	status = "disabled";
+};
