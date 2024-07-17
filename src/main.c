@@ -91,14 +91,14 @@ UART_ASYNC_ADAPTER_INST_DEFINE(async_adapter);
 #define async_adapter NULL
 #endif
 
-// int pwr_measure_demo(void)
-// {
-//     fb_v_measure_select(V_CAP);
-//     k_sleep(FB_DEMO_DELAY);
-//     int v_cap = fb_v_measure();
-//     LOG_DBG("Vcap = %dmV", v_cap);
-// 	return v_cap;
-// }
+int pwr_measure_demo(void)
+{
+    fb_v_measure_select(V_CAP);
+    k_sleep(FB_DEMO_DELAY);
+    int v_cap = fb_v_measure();
+    LOG_DBG("Vcap = %dmV", v_cap);
+	return v_cap;
+}
 
 // void ble_stack_init(void) {
 //     ret_code_t err_code;
@@ -714,20 +714,20 @@ void ble_write_thread(void)
             nus_data.len += plen; // Update length of data in BLE buffer
             loc += plen; // Move location offset
 
-			// if (nus_data.data[nus_data.len - 1] == 'V') {
-            //     /* Call the function to read voltage value */
-            //     int voltage = pwr_measure_demo(); // Call your modified voltage reading function
+			if (nus_data.data[nus_data.len - 1] == 'V') {
+                /* Call the function to read voltage value */
+                int voltage = pwr_measure_demo(); // Call your modified voltage reading function
 
-            //     /* Convert the voltage value to a string */
-            //     char voltage_str[10];
-            //     snprintf(voltage_str, sizeof(voltage_str), "%d", voltage);
+                /* Convert the voltage value to a string */
+                char voltage_str[10];
+                snprintf(voltage_str, sizeof(voltage_str), "%d", voltage);
 
-            //     /* Send the voltage value back over BLE using NUS */
-            //     if (bt_nus_send(NULL, voltage_str, strlen(voltage_str))) {
-            //         LOG_WRN("Failed to send voltage data over BLE connection");
-            //     }
-            //     nus_data.len = 0; // Reset BLE buffer length for next data batch
-            // } 
+                /* Send the voltage value back over BLE using NUS */
+                if (bt_nus_send(NULL, voltage_str, strlen(voltage_str))) {
+                    LOG_WRN("Failed to send voltage data over BLE connection");
+                }
+                nus_data.len = 0; // Reset BLE buffer length for next data batch
+            } 
 
             /* Check if BLE buffer is full or if last character is newline or carriage return */
             if (nus_data.len >= sizeof(nus_data.data) ||
