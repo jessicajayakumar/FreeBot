@@ -1,0 +1,6 @@
+{
+    "nrf-connect.applications": [
+        "${workspaceFolder}/peripheral_uart",
+        "${workspaceFolder}/central_uart"
+    ]
+}

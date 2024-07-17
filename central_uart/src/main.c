@@ -8,6 +8,7 @@
  *  @brief Nordic UART Service Client sample
  */
 
+/*Note: this probably won't build. working on fixing this. try and removing the code involving the leds, seems to be a problem*/
 #include <errno.h>
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
