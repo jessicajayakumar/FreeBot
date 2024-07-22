@@ -24,10 +24,10 @@ endif()
 target_include_directories(app PRIVATE lib/freebot/inc)
 target_sources(app PRIVATE src/main.c)
 
-# Include UART ASYNC API adapter
-target_sources_ifdef(CONFIG_BT_NUS_UART_ASYNC_ADAPTER app PRIVATE
-  src/uart_async_adapter.c
-)
+# # Include UART ASYNC API adapter
+# target_sources_ifdef(CONFIG_BT_NUS_UART_ASYNC_ADAPTER app PRIVATE
+#   src/uart_async_adapter.c
+# )
 
 # NORDIC SDK APP END
 
