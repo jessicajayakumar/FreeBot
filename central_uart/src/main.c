@@ -42,7 +42,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 #define KEY_PASSKEY_ACCEPT DK_BTN1_MSK /**< The mask for the accept passkey button. */
 #define KEY_PASSKEY_REJECT DK_BTN2_MSK /**< The mask for the reject passkey button. */
 
-#define CON_STATUS_LED DK_LED2 /**< The LED pin for the connection status. */
+// #define CON_STATUS_LED DK_LED2 /**< The LED pin for the connection status. */
 
 #define RUN_STATUS_LED DK_LED1 /**< The LED pin for the run status. */
 #define RUN_LED_BLINK_INTERVAL 1000 /**< The interval for blinking the run status LED. */
@@ -56,7 +56,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 #define CON_STATUS_LED DK_LED2 /**< The LED pin for the connection status. */
 
-#define RUN_STATUS_LED DK_LED1 /**< The LED pin for the run status. */
+// #define RUN_STATUS_LED DK_LED1 /**< The LED pin for the run status. */
 #define RUN_LED_BLINK_INTERVAL 1000
 
 #define NUS_WRITE_TIMEOUT K_MSEC(150)
@@ -388,7 +388,7 @@ static void connected(struct bt_conn *conn, uint8_t conn_err) // Define the conn
 
     LOG_INF("Connected: %s", addr); // Log successful connection
 
-	dk_set_led_on(CON_STATUS_LED);
+	// dk_set_led_on(CON_STATUS_LED);
 
     static struct bt_gatt_exchange_params exchange_params; // Static variable for MTU exchange parameters
 
@@ -422,7 +422,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
     LOG_INF("Disconnected: %s (reason %u)", addr, reason); // Log disconnection with reason
 
-	dk_set_led_off(CON_STATUS_LED); 
+	// dk_set_led_off(CON_STATUS_LED); 
 
     if (default_conn != conn) { // Check if the disconnected connection is not the default connection
         return; // Exit if true
@@ -588,7 +588,7 @@ static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
 int main(void)
 {
     int err; // Variable for error codes
-	int blink_status = 0;
+	// int blink_status = 0;
 
     // Register authorization callbacks
     err = bt_conn_auth_cb_register(&conn_auth_callbacks);
@@ -655,7 +655,7 @@ int main(void)
 
     // Main loop
     for (;;) {
-		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
+		// dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
 		k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL));
         // Wait indefinitely for data from UART
         struct uart_data_t *buf = k_fifo_get(&fifo_uart_rx_data, K_FOREVER);
