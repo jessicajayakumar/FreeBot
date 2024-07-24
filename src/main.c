@@ -34,6 +34,8 @@
 
 #include <zephyr/logging/log.h>
 
+static bool data_received = false;
+
 #define LOG_MODULE_NAME peripheral_uart
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
@@ -86,13 +88,6 @@ UART_ASYNC_ADAPTER_INST_DEFINE(async_adapter);
 #else
 #define async_adapter NULL
 #endif
-
-/* Code to test the ble notify service of the freebot*/
-/* Define UUIDs for the service and characteristic */
-#define BT_UUID_CUSTOM_SERVICE BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x1234567890AB))
-#define BT_UUID_CUSTOM_CHAR BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x1234567890AC))
-
-#define CCCD_NOTIFY_ENABLE 0x0001
 
 
 static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
@@ -480,8 +475,10 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr));
 
 	LOG_INF("Received data from: %s", addr);
+	data_received = true;
 
 	for (uint16_t pos = 0; pos != len;) {
+		LOG_INF("Trying to write data to UART");
 		struct uart_data_t *tx = k_malloc(sizeof(*tx));
 
 		if (!tx) {
@@ -499,7 +496,7 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 		}
 
 		memcpy(tx->data, &data[pos], tx->len);
-
+		LOG_INF("Received data from BLE copy to UART");
 		pos += tx->len;
 
 		/* Append the LF character when the CR character triggered
@@ -509,7 +506,7 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 			tx->data[tx->len] = '\n';
 			tx->len++;
 		}
-
+		LOG_INF("Trying to transmit data to UART");
 		err = uart_tx(uart, tx->data, tx->len, SYS_FOREVER_MS);
 		if (err) {
 			k_fifo_put(&fifo_uart_tx_data, tx);
@@ -586,10 +583,6 @@ int main(void)
 
 	configure_gpio();
 
-	err = uart_init();
-	if (err) {
-		error();
-	}
 
 	if (IS_ENABLED(CONFIG_BT_NUS_SECURITY_ENABLED)) {
 		err = bt_conn_auth_cb_register(&conn_auth_callbacks);
@@ -641,37 +634,24 @@ void ble_write_thread(void)
 {
 	/* Don't go any further until BLE is initialized */
 	k_sem_take(&ble_init_ok, K_FOREVER);
-	struct uart_data_t nus_data = {
-		.len = 0,
-	};
 
-	for (;;) {
-		/* Wait indefinitely for data to be sent over bluetooth */
-		struct uart_data_t *buf = k_fifo_get(&fifo_uart_rx_data,
-						     K_FOREVER);
+	/* Define the message to be sent periodically */
+    const char message[] = "Hello BLE!";
+    size_t message_len = sizeof(message) - 1; // Exclude null terminator
 
-		int plen = MIN(sizeof(nus_data.data) - nus_data.len, buf->len);
-		int loc = 0;
+    for (;;) {
+        /* Wait for a specified period - e.g., 1000 milliseconds */
+        k_sleep(K_MSEC(1000));
 
-		while (plen > 0) {
-			memcpy(&nus_data.data[nus_data.len], &buf->data[loc], plen);
-			nus_data.len += plen;
-			loc += plen;
-
-			if (nus_data.len >= sizeof(nus_data.data) ||
-			   (nus_data.data[nus_data.len - 1] == '\n') ||
-			   (nus_data.data[nus_data.len - 1] == '\r')) {
-				if (bt_nus_send(NULL, nus_data.data, nus_data.len)) {
-					LOG_WRN("Failed to send data over BLE connection");
-				}
-				nus_data.len = 0;
+		if (data_received) {
+        /* Send the predefined message over BLE */
+			if (bt_nus_send(NULL, message, message_len)) {
+				LOG_WRN("Failed to send data over BLE connection");
 			}
-
-			plen = MIN(sizeof(nus_data.data), buf->len - loc);
+    	
 		}
-
-		k_free(buf);
 	}
+	
 }
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
