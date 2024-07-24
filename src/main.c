@@ -7,11 +7,9 @@
 /** @file
  *  @brief Nordic UART Bridge Service (NUS) sample
  */
-#include "uart_async_adapter.h"
 
 #include <zephyr/types.h>
-#include <zephyr/kernel.h>
-#include <zephyr/drivers/uart.h>
+#include <zephyr/kernel.h> 
 #include <zephyr/usb/usb_device.h>
 
 #include <zephyr/device.h>
@@ -78,6 +76,56 @@ static const struct bt_data ad[] = {
 static const struct bt_data sd[] = {
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_NUS_VAL),
 };
+
+
+/* FreeBot Control Service */
+#define BT_UUID_FBCS_VAL BT_UUID_128_ENCODE(0x00000030, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
+#define BT_UUID_FBCS BT_UUID_DECLARE_128(BT_UUID_FBCS_VAL)
+
+/* Voltage Characteristic */
+#define BT_UUID_FBCS_V_VAL BT_UUID_128_ENCODE(0x00000031, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
+#define BT_UUID_FBCS_V BT_UUID_DECLARE_128(BT_UUID_FBCS_V_VAL)
+
+
+#define CCCD_NOTIFY_ENABLE 0x0001
+
+static ssize_t read_custom_char(struct bt_conn *conn,
+                                const struct bt_gatt_attr *attr, void *buf,
+                                uint16_t len, uint16_t offset)
+{
+    const char *value = "Hello, World!";
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, value, strlen(value));
+}
+
+static ssize_t write_custom_char(struct bt_conn *conn,
+                                 const struct bt_gatt_attr *attr, const void *buf,
+                                 uint16_t len, uint16_t offset, uint8_t flags)
+{
+    // Handle the data written to the characteristic
+    LOG_INF("Data written to characteristic");
+
+    // Send an acknowledgment back to the central device
+    const char *ack = "Data received";
+    bt_gatt_notify(conn, attr, ack, strlen(ack));
+
+    return len;
+}
+
+static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
+    printk("Notifications %s\n", notifications_enabled ? "enabled" : "disabled");
+}
+
+BT_GATT_SERVICE_DEFINE(custom_svc,
+    BT_GATT_PRIMARY_SERVICE(BT_UUID_FBCS),
+    BT_GATT_CHARACTERISTIC(BT_UUID_FBCS_V,
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
+                           read_custom_char, write_custom_char, NULL),
+	BT_GATT_CCC(ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+);
+
 
 
 
