@@ -35,7 +35,7 @@
 #include <zephyr/logging/log.h>
 
 #define LOG_MODULE_NAME peripheral_uart
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE
 #define PRIORITY 7
@@ -112,6 +112,8 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		} else {
 			buf = CONTAINER_OF(evt->data.tx.buf, struct uart_data_t,
 					   data[0]);
+			LOG_INF("Data received from dkb: %s", buf->data);
+			LOG_INF("Data length: %d", buf->len);
 		}
 
 		k_free(buf);
@@ -178,6 +180,9 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		LOG_DBG("UART_RX_BUF_RELEASED");
 		buf = CONTAINER_OF(evt->data.rx_buf.buf, struct uart_data_t,
 				   data[0]);
+
+		LOG_INF("Data received from terminal: %s", buf->data);
+		LOG_INF("Data length: %d", buf->len);
 
 		if (buf->len > 0) {
 			k_fifo_put(&fifo_uart_rx_data, buf);
@@ -493,6 +498,8 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 		memcpy(tx->data, &data[pos], tx->len);
 
 		pos += tx->len;
+
+
 
 		/* Append the LF character when the CR character triggered
 		 * transmission from the peer.
