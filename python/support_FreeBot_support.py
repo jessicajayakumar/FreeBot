@@ -18,7 +18,7 @@ import threading
 
 import support_FreeBot
 
-port = 'COM12'
+port = '/dev/ttyACM1'
 baud_rate = 115200
 
 
