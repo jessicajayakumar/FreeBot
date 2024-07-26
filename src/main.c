@@ -32,6 +32,8 @@
 
 #include <zephyr/logging/log.h>
 
+#include "freebot.h"
+
 static bool data_received = false;
 
 #define LOG_MODULE_NAME peripheral_uart
@@ -77,6 +79,10 @@ static const struct bt_data sd[] = {
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_NUS_VAL),
 };
 
+// **********************************************************
+// FreeBot Control Service
+// **********************************************************
+
 
 /* FreeBot Control Service */
 #define BT_UUID_FBCS_VAL BT_UUID_128_ENCODE(0x00000030, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
@@ -89,11 +95,14 @@ static const struct bt_data sd[] = {
 
 #define CCCD_NOTIFY_ENABLE 0x0001
 
+static struct bt_gatt_attr *notification_attr;
+
 static ssize_t read_custom_char(struct bt_conn *conn,
                                 const struct bt_gatt_attr *attr, void *buf,
                                 uint16_t len, uint16_t offset)
 {
     const char *value = "Hello, World!";
+	LOG_INF("Within read_custom_char");
     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, strlen(value));
 }
 
@@ -106,7 +115,14 @@ static ssize_t write_custom_char(struct bt_conn *conn,
 
     // Send an acknowledgment back to the central device
     const char *ack = "Data received";
-    bt_gatt_notify(conn, attr, ack, strlen(ack));
+    if (notification_attr) {
+        int err = bt_gatt_notify(conn, notification_attr, ack, strlen(ack));
+        if (err) {
+            printk("Notification failed: %d\n", err);
+        }
+    }
+
+    return len;
 
     return len;
 }
@@ -115,6 +131,11 @@ static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
     bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
     printk("Notifications %s\n", notifications_enabled ? "enabled" : "disabled");
+	if (notifications_enabled) {
+        notification_attr = (struct bt_gatt_attr *)attr;
+    } else {
+        notification_attr = NULL;
+    }
 }
 
 BT_GATT_SERVICE_DEFINE(custom_svc,
@@ -126,7 +147,9 @@ BT_GATT_SERVICE_DEFINE(custom_svc,
 	BT_GATT_CCC(ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 );
 
-
+// **********************************************************
+// BLE Connection and configuration
+// **********************************************************
 
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -268,6 +291,7 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr));
 
 	LOG_INF("Received data from: %s", addr);
+	LOG_INF("data received: %d",len);
 	data_received = true;
 
 }
@@ -334,12 +358,18 @@ static void configure_gpio(void)
 	}
 }
 
+// **********************************************************
+// Main function
+// **********************************************************
+
 int main(void)
 {
 	int blink_status = 0;
 	int err = 0;
 
 	configure_gpio();
+	fb_init();
+    fb_v_measure_select(V_CAP);
 
 
 	if (IS_ENABLED(CONFIG_BT_NUS_SECURITY_ENABLED)) {
@@ -388,25 +418,33 @@ int main(void)
 	}
 }
 
+// **********************************************************
+// BLE thread
+// **********************************************************
+
 void ble_write_thread(void)
 {
 	/* Don't go any further until BLE is initialized */
 	k_sem_take(&ble_init_ok, K_FOREVER);
 
-	/* Define the message to be sent periodically */
-    const char message[] = "Hello BLE!";
-    size_t message_len = sizeof(message) - 1; // Exclude null terminator
+	
 
     for (;;) {
         /* Wait for a specified period - e.g., 1000 milliseconds */
-        k_sleep(K_MSEC(1000));
+        k_sleep(K_MSEC(10000));
 
 		if (data_received) {
-        /* Send the predefined message over BLE */
-			if (bt_nus_send(NULL, message, message_len)) {
+        	/* Send the predefined message over BLE */
+			int v_cap = fb_v_measure();
+
+			// Rescale according to voltage divider -> TA said to multiply with factor 40
+			uint8_t volt_val = 0x01; 
+			LOG_INF("Voltage: %d", volt_val);
+		
+			LOG_INF("Sending data: %d (0x%02X)", volt_val, volt_val);
+			if (bt_nus_send(NULL,volt_val, sizeof(volt_val))) {
 				LOG_WRN("Failed to send data over BLE connection");
 			}
-    	
 		}
 	}
 	
@@ -414,3 +452,4 @@ void ble_write_thread(void)
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
 		NULL, PRIORITY, 0, 0);
+	

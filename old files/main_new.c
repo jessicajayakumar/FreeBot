@@ -113,7 +113,7 @@ static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
     printk("Notifications %s\n", notifications_enabled ? "enabled" : "disabled");
 }
 
-BT_GATT_SERVICE_DEFINE(custom_svc,
+BT_GATT_SERVICE_DEFINE(freebot_svc,
     BT_GATT_PRIMARY_SERVICE(BT_UUID_CUSTOM_SERVICE),
     BT_GATT_CHARACTERISTIC(BT_UUID_CUSTOM_CHAR,
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY,
@@ -263,7 +263,7 @@ void le_data_received(struct bt_conn *conn, const uint8_t *data, size_t len) {
 
     // Send acknowledgment to the central device
     const char *ack = "Data received";
-    bt_gatt_notify(conn, &custom_svc.attrs[1], ack, strlen(ack));
+    bt_gatt_notify(conn, &freebot_svc.attrs[1], ack, strlen(ack));
 }
 
 
