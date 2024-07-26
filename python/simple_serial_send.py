@@ -14,7 +14,7 @@ import time
 import random
 import threading
 
-port = '/dev/ttyACM1'
+port = '/dev/ttyACM0'
 baud_rate = 115200
 
 
