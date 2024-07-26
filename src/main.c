@@ -432,45 +432,51 @@ void ble_write_thread(void)
 		.len = 0,
 	};
 
-	int v_cap = fb_v_measure();
-	LOG_INF("Voltage: %d", v_cap);
-	uint8_t volt_val=(v_cap*40)/1000;
-
-	uint8_t msg[] = {volt_val}; // Example data
-	size_t msg_len = sizeof(msg);
-
-	int plen = MIN(sizeof(data.data) - data.len, msg_len);
-	int loc = 0;
 	
     for (;;) {
         /* Wait for a specified period - e.g., 1000 milliseconds */
         k_sleep(K_MSEC(1000));
 
-		if (data_received && plen > 0) {
+		int v_cap = fb_v_measure();
+		LOG_INF("Voltage: %d", v_cap);
+		uint8_t volt_val=(v_cap*100)/3000;
+
+		uint8_t msg[] = {volt_val}; // Example data
+		size_t msg_len = sizeof(msg);
+
+		int loc = 0;
+
+		
+
+		int plen = MIN(sizeof(data.data) - data.len, msg_len);
+
+		if (plen>0){
 
 			for (int i = 0; i < plen; i++) {
-				LOG_INF("Data to be sent over BLE: %02X", msg[loc]);
-			}
-
-			memcpy(&data.data[data.len], &msg[loc], plen);
-			data.len += plen;
-			loc += plen;
-
-			for (int i = 0; i < data.len; i++) {
-				LOG_INF("Data to be sent over BLE: %02X", data.data[i]);
-			}
-			LOG_INF("Data length: %d", data.len);
-
-			if (data.len >= sizeof(data.data) || loc >= msg_len) {
-				if (bt_nus_send(NULL, data.data, data.len)) {
-					LOG_WRN("Failed to send data over BLE connection");
-				}
-				LOG_INF("data sent over BLE");
-				data.len = 0;
-			}
-
-			plen = MIN(sizeof(data.data), msg_len - loc);
+			LOG_INF("Data to be sent over BLE: %d", msg[loc]);
 		}
+
+		memcpy(&data.data[data.len], &msg[loc], plen);
+		data.len += plen;
+		loc += plen;
+
+		for (int i = 0; i < data.len; i++) {
+			LOG_INF("Data to be sent over BLE: %d", data.data[i]);
+		}
+		LOG_INF("Data length: %d", data.len);
+
+		if (data.len >= sizeof(data.data) || loc >= msg_len) {
+			if (bt_nus_send(NULL, data.data, data.len)) {
+				LOG_WRN("Failed to send data over BLE connection");
+			}
+			LOG_INF("data sent over BLE");
+			data.len = 0;
+		}
+
+		plen = MIN(sizeof(data.data), msg_len - loc);
+			
+		}
+		
 	}
 	
 }
