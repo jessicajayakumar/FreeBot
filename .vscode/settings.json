@@ -9,6 +9,9 @@
         "array": "c",
         "string": "c",
         "string_view": "c",
-        "gap.h": "c"
+        "gap.h": "c",
+        "random": "c",
+        "*.tcc": "c",
+        "typeinfo": "c"
     }
 }

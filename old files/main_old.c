@@ -35,7 +35,7 @@
 #include <zephyr/logging/log.h>
 
 #define LOG_MODULE_NAME peripheral_uart
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE
 #define PRIORITY 7
@@ -112,6 +112,8 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		} else {
 			buf = CONTAINER_OF(evt->data.tx.buf, struct uart_data_t,
 					   data[0]);
+			LOG_INF("Data received from dkb: %s", buf->data);
+			LOG_INF("Data length: %d", buf->len);
 		}
 
 		k_free(buf);
@@ -178,6 +180,9 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		LOG_DBG("UART_RX_BUF_RELEASED");
 		buf = CONTAINER_OF(evt->data.rx_buf.buf, struct uart_data_t,
 				   data[0]);
+
+		LOG_INF("Data received from terminal: %s", buf->data);
+		LOG_INF("Data length: %d", buf->len);
 
 		if (buf->len > 0) {
 			k_fifo_put(&fifo_uart_rx_data, buf);
@@ -472,6 +477,10 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr));
 
 	LOG_INF("Received data from: %s", addr);
+	LOG_INF("Received data length: %d", len);
+	for (int i = 0; i < len; i++) {
+		LOG_INF("Received data: %c", data[i]);
+	}
 
 	for (uint16_t pos = 0; pos != len;) {
 		struct uart_data_t *tx = k_malloc(sizeof(*tx));
@@ -492,7 +501,10 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 
 		memcpy(tx->data, &data[pos], tx->len);
 
+
 		pos += tx->len;
+
+
 
 		/* Append the LF character when the CR character triggered
 		 * transmission from the peer.
@@ -646,9 +658,19 @@ void ble_write_thread(void)
 		int loc = 0;
 
 		while (plen > 0) {
+
+			for (int i = 0; i < plen; i++) {
+				LOG_INF("Data to be sent over BLE: %02X", buf->data[loc]);
+			}
+
 			memcpy(&nus_data.data[nus_data.len], &buf->data[loc], plen);
 			nus_data.len += plen;
 			loc += plen;
+
+			for (int i = 0; i < nus_data.len; i++) {
+				LOG_INF("Data to be sent over BLE: %02X", nus_data.data[i]);
+			}
+			LOG_INF("Data length: %d", nus_data.len);
 
 			if (nus_data.len >= sizeof(nus_data.data) ||
 			   (nus_data.data[nus_data.len - 1] == '\n') ||

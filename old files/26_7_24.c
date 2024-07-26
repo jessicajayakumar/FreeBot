@@ -11,7 +11,7 @@
 #include <zephyr/types.h>
 #include <zephyr/kernel.h> 
 #include <zephyr/usb/usb_device.h>
- 
+
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <soc.h>
@@ -63,8 +63,8 @@ static struct bt_conn *current_conn;
 static struct bt_conn *auth_conn;
 
 struct nus_data {
-	uint8_t data[256];
-	size_t len;
+	uint8_t data[UART_BUF_SIZE];
+	uint16_t len;
 };
 
 static const struct bt_data ad[] = {
@@ -81,68 +81,68 @@ static const struct bt_data sd[] = {
 // **********************************************************
 
 
-// /* FreeBot Control Service */
-// #define BT_UUID_FBCS_VAL BT_UUID_128_ENCODE(0x00000030, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
-// #define BT_UUID_FBCS BT_UUID_DECLARE_128(BT_UUID_FBCS_VAL)
+/* FreeBot Control Service */
+#define BT_UUID_FBCS_VAL BT_UUID_128_ENCODE(0x00000030, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
+#define BT_UUID_FBCS BT_UUID_DECLARE_128(BT_UUID_FBCS_VAL)
 
-// /* Voltage Characteristic */
-// #define BT_UUID_FBCS_V_VAL BT_UUID_128_ENCODE(0x00000031, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
-// #define BT_UUID_FBCS_V BT_UUID_DECLARE_128(BT_UUID_FBCS_V_VAL)
+/* Voltage Characteristic */
+#define BT_UUID_FBCS_V_VAL BT_UUID_128_ENCODE(0x00000031, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
+#define BT_UUID_FBCS_V BT_UUID_DECLARE_128(BT_UUID_FBCS_V_VAL)
 
 
-// #define CCCD_NOTIFY_ENABLE 0x0001
+#define CCCD_NOTIFY_ENABLE 0x0001
 
-// static struct bt_gatt_attr *notification_attr;
+static struct bt_gatt_attr *notification_attr;
 
-// static ssize_t read_custom_char(struct bt_conn *conn,
-//                                 const struct bt_gatt_attr *attr, void *buf,
-//                                 uint16_t len, uint16_t offset)
-// {
-//     const char *value = "Hello, World!";
-// 	LOG_INF("Within read_custom_char");
-//     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, strlen(value));
-// }
+static ssize_t read_custom_char(struct bt_conn *conn,
+                                const struct bt_gatt_attr *attr, void *buf,
+                                uint16_t len, uint16_t offset)
+{
+    const char *value = "Hello, World!";
+	LOG_INF("Within read_custom_char");
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, value, strlen(value));
+}
 
-// static ssize_t write_custom_char(struct bt_conn *conn,
-//                                  const struct bt_gatt_attr *attr, const void *buf,
-//                                  uint16_t len, uint16_t offset, uint8_t flags)
-// {
-//     // Handle the data written to the characteristic
-//     LOG_INF("Data written to characteristic");
+static ssize_t write_custom_char(struct bt_conn *conn,
+                                 const struct bt_gatt_attr *attr, const void *buf,
+                                 uint16_t len, uint16_t offset, uint8_t flags)
+{
+    // Handle the data written to the characteristic
+    LOG_INF("Data written to characteristic");
 
-//     // Send an acknowledgment back to the central device
-//     const char *ack = "Data received";
-//     if (notification_attr) {
-//         int err = bt_gatt_notify(conn, notification_attr, ack, strlen(ack));
-//         if (err) {
-//             printk("Notification failed: %d\n", err);
-//         }
-//     }
+    // Send an acknowledgment back to the central device
+    const char *ack = "Data received";
+    if (notification_attr) {
+        int err = bt_gatt_notify(conn, notification_attr, ack, strlen(ack));
+        if (err) {
+            printk("Notification failed: %d\n", err);
+        }
+    }
 
-//     return len;
+    return len;
 
-//     return len;
-// }
+    return len;
+}
 
-// static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
-// {
-//     bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
-//     printk("Notifications %s\n", notifications_enabled ? "enabled" : "disabled");
-// 	if (notifications_enabled) {
-//         notification_attr = (struct bt_gatt_attr *)attr;
-//     } else {
-//         notification_attr = NULL;
-//     }
-// }
+static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
+    printk("Notifications %s\n", notifications_enabled ? "enabled" : "disabled");
+	if (notifications_enabled) {
+        notification_attr = (struct bt_gatt_attr *)attr;
+    } else {
+        notification_attr = NULL;
+    }
+}
 
-// BT_GATT_SERVICE_DEFINE(custom_svc,
-//     BT_GATT_PRIMARY_SERVICE(BT_UUID_FBCS),
-//     BT_GATT_CHARACTERISTIC(BT_UUID_FBCS_V,
-//                            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY,
-//                            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
-//                            read_custom_char, write_custom_char, NULL),
-// 	BT_GATT_CCC(ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-// );
+BT_GATT_SERVICE_DEFINE(custom_svc,
+    BT_GATT_PRIMARY_SERVICE(BT_UUID_FBCS),
+    BT_GATT_CHARACTERISTIC(BT_UUID_FBCS_V,
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
+                           read_custom_char, write_custom_char, NULL),
+	BT_GATT_CCC(ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+);
 
 // **********************************************************
 // BLE Connection and configuration
@@ -428,48 +428,25 @@ void ble_write_thread(void)
 {
 	/* Don't go any further until BLE is initialized */
 	k_sem_take(&ble_init_ok, K_FOREVER);
-	struct nus_data data={
-		.len = 0,
-	};
 
-	int v_cap = fb_v_measure();
-	LOG_INF("Voltage: %d", v_cap);
-	uint8_t volt_val=(v_cap*40)/1000;
-
-	uint8_t msg[] = {volt_val}; // Example data
-	size_t msg_len = sizeof(msg);
-
-	int plen = MIN(sizeof(data.data) - data.len, msg_len);
-	int loc = 0;
 	
+
     for (;;) {
         /* Wait for a specified period - e.g., 1000 milliseconds */
-        k_sleep(K_MSEC(1000));
+        k_sleep(K_MSEC(10000));
 
-		if (data_received && plen > 0) {
+		if (data_received) {
+        	/* Send the predefined message over BLE */
+			int v_cap = fb_v_measure();
 
-			for (int i = 0; i < plen; i++) {
-				LOG_INF("Data to be sent over BLE: %02X", msg[loc]);
+			// Rescale according to voltage divider -> TA said to multiply with factor 40
+			uint8_t volt_val = 0x23; // 35 in decimal
+			LOG_INF("Voltage: %d", volt_val);
+		
+			LOG_INF("Sending data: %d (0x%02X)", volt_val, volt_val);
+			if (bt_nus_send(NULL,(const uint8_t*) volt_val, sizeof(volt_val))) {
+				LOG_WRN("Failed to send data over BLE connection");
 			}
-
-			memcpy(&data.data[data.len], &msg[loc], plen);
-			data.len += plen;
-			loc += plen;
-
-			for (int i = 0; i < data.len; i++) {
-				LOG_INF("Data to be sent over BLE: %02X", data.data[i]);
-			}
-			LOG_INF("Data length: %d", data.len);
-
-			if (data.len >= sizeof(data.data) || loc >= msg_len) {
-				if (bt_nus_send(NULL, data.data, data.len)) {
-					LOG_WRN("Failed to send data over BLE connection");
-				}
-				LOG_INF("data sent over BLE");
-				data.len = 0;
-			}
-
-			plen = MIN(sizeof(data.data), msg_len - loc);
 		}
 	}
 	
