@@ -37,7 +37,7 @@
 static bool data_received = false;
 
 #define LOG_MODULE_NAME peripheral_uart
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE
 #define PRIORITY 7
@@ -61,9 +61,6 @@ static K_SEM_DEFINE(ble_init_ok, 0, 1);
 
 static struct bt_conn *current_conn;
 static struct bt_conn *auth_conn;
-
-static const struct device *uart = DEVICE_DT_GET(DT_CHOSEN(nordic_nus_uart));
-static struct k_work_delayable uart_work;
 
 struct nus_data {
 	uint8_t data[UART_BUF_SIZE];
@@ -292,6 +289,11 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 
 	LOG_INF("Received data from: %s", addr);
 	LOG_INF("data received: %d",len);
+	LOG_INF("Data received:");
+    for (uint16_t i = 0; i < len; i++) {
+        LOG_INF("0x%02x ", data[i]);
+    }
+	
 	data_received = true;
 
 }
@@ -438,11 +440,11 @@ void ble_write_thread(void)
 			int v_cap = fb_v_measure();
 
 			// Rescale according to voltage divider -> TA said to multiply with factor 40
-			uint8_t volt_val = 0x01; 
+			uint8_t volt_val = 0x23; // 35 in decimal
 			LOG_INF("Voltage: %d", volt_val);
 		
 			LOG_INF("Sending data: %d (0x%02X)", volt_val, volt_val);
-			if (bt_nus_send(NULL,volt_val, sizeof(volt_val))) {
+			if (bt_nus_send(NULL,(const uint8_t*) volt_val, sizeof(volt_val))) {
 				LOG_WRN("Failed to send data over BLE connection");
 			}
 		}
