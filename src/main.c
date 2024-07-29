@@ -40,8 +40,7 @@ static bool data_received = false;
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE
-#define BLE_PRIORITY 7
-#define MV_PRIORITY 7
+#define PRIORITY 7
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN	(sizeof(DEVICE_NAME) - 1)
@@ -58,13 +57,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 #define UART_WAIT_FOR_BUF_DELAY K_MSEC(50)
 #define UART_WAIT_FOR_RX CONFIG_BT_NUS_UART_RX_WAIT_TIME
 
-#define FBCS_STOP        0b0000
-#define FBCS_MV_FORWARD  0b0010
-#define FBCS_MV_BACKWARD 0b0011
-#define FBCS_MV_RIGHT    0b0100
-#define FBCS_MV_LEFT     0b0101
-#define FBCS_ROT_CW      0b0110
-#define FBCS_ROT_CCW     0b0111
 
 static K_SEM_DEFINE(ble_init_ok, 0, 1);
 struct k_timer voltage_timer;
@@ -86,126 +78,6 @@ static const struct bt_data sd[] = {
 	BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_NUS_VAL),
 };
 
-
-void fb_move_thread(void);
-
-
-// **********************************************************
-// FreeBot Control Service
-// **********************************************************
-
-
-// /* FreeBot Control Service */
-// #define BT_UUID_FBCS_VAL BT_UUID_128_ENCODE(0x00000030, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
-// #define BT_UUID_FBCS BT_UUID_DECLARE_128(BT_UUID_FBCS_VAL)
-
-// /* Drive Characteristic */
-// #define BT_UUID_FBCS_DRV_VAL BT_UUID_128_ENCODE(0x00000031, 0x0000, 0x1000, 0x8000, 0x00805f9b34fb)
-// #define BT_UUID_FBCS_DRV BT_UUID_DECLARE_128(BT_UUID_FBCS_DRV_VAL)
-
-
-// #define CCCD_NOTIFY_ENABLE 0x0001
-
-// static struct bt_gatt_attr *notification_attr;
-
-
-// static ssize_t fbcs_drive(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
-// {
-//     LOG_DBG("handle: %u, conn: %p", attr->handle, (void *)conn);
-
-    
-//         fb_straight_forw();
-//         LOG_DBG("Robot moving forward");
-//         break;
-//     case FBCS_MV_BACKWARD:
-//         fb_straight_back();
-//         LOG_DBG("Robot moving backward");
-//         break;
-//     case FBCS_MV_RIGHT:
-//         fb_side_right();
-//         LOG_DBG("Robot moving right");
-//         break;
-//     case FBCS_MV_LEFT:
-//         fb_side_left();
-//         LOG_DBG("Robot moving left");
-//         break;
-//     case FBCS_ROT_CW:
-//         fb_rotate_cw();
-//         LOG_DBG("Robot rotating clockwise");
-//         break;
-//     case FBCS_ROT_CCW:
-//         fb_rotate_ccw();
-//         LOG_DBG("Robot rotating counterclockwise");
-//         break;
-
-//     default:
-//         LOG_WRN("Received unknown drive cmd");
-//         fb_stop();
-//         break;
-//     }
-
-//     return len;
-// }
-
-// BT_GATT_SERVICE_DEFINE(
-//     // FreeBot Control Service
-//     fbcs_svc, BT_GATT_PRIMARY_SERVICE(BT_UUID_FBCS),
-//     // FreeBot Drive characteristic
-//     BT_GATT_CHARACTERISTIC(BT_UUID_FBCS_DRV,
-//                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_WRITE_WITHOUT_RESP,
-//                            BT_GATT_PERM_WRITE,
-//                            NULL, fbcs_drive, NULL),
-// );
-
-// static ssize_t read_custom_char(struct bt_conn *conn,
-//                                 const struct bt_gatt_attr *attr, void *buf,
-//                                 uint16_t len, uint16_t offset)
-// {
-//     const char *value = "Hello, World!";
-// 	LOG_INF("Within read_custom_char");
-//     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, strlen(value));
-// }
-
-// static ssize_t write_custom_char(struct bt_conn *conn,
-//                                  const struct bt_gatt_attr *attr, const void *buf,
-//                                  uint16_t len, uint16_t offset, uint8_t flags)
-// {
-//     // Handle the data written to the characteristic
-//     LOG_INF("Data written to characteristic");
-
-//     // Send an acknowledgment back to the central device
-//     const char *ack = "Data received";
-//     if (notification_attr) {
-//         int err = bt_gatt_notify(conn, notification_attr, ack, strlen(ack));
-//         if (err) {
-//             printk("Notification failed: %d\n", err);
-//         }
-//     }
-
-//     return len;
-
-//     return len;
-// }
-
-// static void ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
-// {
-//     bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
-//     printk("Notifications %s\n", notifications_enabled ? "enabled" : "disabled");
-// 	if (notifications_enabled) {
-//         notification_attr = (struct bt_gatt_attr *)attr;
-//     } else {
-//         notification_attr = NULL;
-//     }
-// }
-
-// BT_GATT_SERVICE_DEFINE(custom_svc,
-//     BT_GATT_PRIMARY_SERVICE(BT_UUID_FBCS),
-//     BT_GATT_CHARACTERISTIC(BT_UUID_FBCS_V,
-//                            BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE | BT_GATT_CHRC_NOTIFY,
-//                            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE,
-//                            read_custom_char, write_custom_char, NULL),
-// 	BT_GATT_CCC(ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-// );
 
 // **********************************************************
 // BLE Connection and configuration
@@ -345,7 +217,7 @@ static struct bt_conn_auth_info_cb conn_auth_info_callbacks;
 static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 			  uint16_t len)
 {
-	int err;
+	// int err;
 	char addr[BT_ADDR_LE_STR_LEN] = {0};
 
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr));
@@ -434,7 +306,6 @@ int main(void)
 
 	configure_gpio();
 	fb_init();
-	fb_motor_init();
     fb_v_measure_select(V_CAP);
 
 
@@ -482,6 +353,7 @@ int main(void)
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);
 		k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL));
 	}
+	return 0;
 }
 
 // **********************************************************
@@ -546,7 +418,6 @@ void ble_write_thread(void)
 		}
 
 		fb_straight_forw();
-
         // Short sleep to prevent busy-waiting and allow other threads to run
         k_msleep(10);
 
@@ -556,6 +427,6 @@ void ble_write_thread(void)
 
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
-		NULL, BLE_PRIORITY, 0, 0);
+		NULL, PRIORITY, 0, 0);
 
                           
