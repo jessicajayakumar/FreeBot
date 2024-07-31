@@ -16,6 +16,8 @@
 #include <zephyr/devicetree.h> // Include device tree macros and functions
 #include <soc.h> // Include SoC-specific definitions
 
+#include <zephyr/drivers/gpio.h> // Include GPIO driver APIs
+
 #include <zephyr/bluetooth/bluetooth.h> // Include Bluetooth core APIs
 #include <zephyr/bluetooth/uuid.h> // Include Bluetooth UUID definitions
 #include <zephyr/bluetooth/gatt.h> // Include Bluetooth GATT (Generic Attribute Profile) APIs
@@ -23,7 +25,7 @@
 
 #include <bluetooth/services/nus.h> // Include Nordic UART Service (NUS) definitions
 
-#include <dk_buttons_and_leds.h> // Include DK buttons and LEDs support
+// #include <dk_buttons_and_leds.h> // Include DK buttons and LEDs support
 
 #include <zephyr/settings/settings.h> // Include settings storage APIs
 
@@ -36,7 +38,7 @@
 
 static bool data_received = false; // Flag to indicate if data has been received
 
-#define LOG_MODULE_NAME peripheral_uart // Define the log module name
+#define LOG_MODULE_NAME freebot_uart // Define the log module name
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module with debug level
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE // Define the stack size for the thread
@@ -45,13 +47,20 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME // Define the Bluetooth device name
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1) // Calculate the length of the device name
 
-#define RUN_STATUS_LED DK_LED1 // Define the LED for run status
+// #define RUN_STATUS_LED DK_LED1 // Define the LED for run status
 #define RUN_LED_BLINK_INTERVAL 1000 // Define the blink interval for the run status LED in milliseconds
 
-#define CON_STATUS_LED DK_LED2 // Define the LED for connection status
+// #define CON_STATUS_LED DK_LED2 // Define the LED for connection status
 
-#define KEY_PASSKEY_ACCEPT DK_BTN1_MSK // Define the button mask for passkey accept
-#define KEY_PASSKEY_REJECT DK_BTN2_MSK // Define the button mask for passkey reject
+#define LED1 D15 // Define the pin for LED1
+#define LED2 D16 // Define the pin for LED2
+
+#define SW2_NODE DT_NODELABEL(sw2) 
+static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(SW2_NODE, gpios);
+static struct gpio_callback button_cb_data;
+
+// #define KEY_PASSKEY_ACCEPT DK_BTN1_MSK // Define the button mask for passkey accept
+// #define KEY_PASSKEY_REJECT DK_BTN2_MSK // Define the button mask for passkey reject
 
 #define UART_BUF_SIZE CONFIG_BT_NUS_UART_BUFFER_SIZE // Define the UART buffer size
 #define UART_WAIT_FOR_BUF_DELAY K_MSEC(50) // Define the delay for waiting for UART buffer in milliseconds
@@ -78,6 +87,8 @@ static const struct bt_data sd[] = {
 };
 
 
+int auth_btn_sw2_clicked;
+
 // **********************************************************
 // BLE Connection and configuration
 // **********************************************************
@@ -97,7 +108,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
     current_conn = bt_conn_ref(conn); // Reference the current connection to keep it active
 
-    dk_set_led_on(CON_STATUS_LED); // Turn on the connection status LED
+    fb_set_led(LED1); // Turn on the connection status LED
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -116,7 +127,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     if (current_conn) { // Check if there is a current connection
         bt_conn_unref(current_conn); // Unreference the current connection
         current_conn = NULL; // Set the current connection pointer to NULL
-        dk_set_led_off(CON_STATUS_LED); // Turn off the connection status LED
+        fb_clear_led(LED1); // Turn off the connection status LED
     }
 }
 
@@ -234,7 +245,7 @@ static struct bt_nus_cb nus_cb = {
 
 void error(void)
 {
-    dk_set_leds_state(DK_ALL_LEDS_MSK, DK_NO_LEDS_MSK); // Turn off all LEDs
+    // dk_set_leds_state(DK_ALL_LEDS_MSK, DK_NO_LEDS_MSK); // Turn off all LEDs
 
     while (true) {
         /* Spin forever */
@@ -257,37 +268,44 @@ static void num_comp_reply(bool accept)
     auth_conn = NULL; // Set the connection reference to NULL
 }
 
-void button_changed(uint32_t button_state, uint32_t has_changed)
-{
-    uint32_t buttons = button_state & has_changed; // Determine which buttons have changed state
+// void button_changed(uint32_t button_state, uint32_t has_changed)
+// {
+//     uint32_t buttons = button_state & has_changed; // Determine which buttons have changed state
 
+//     if (auth_conn) {
+//         if (buttons & KEY_PASSKEY_ACCEPT) {
+//             num_comp_reply(true); // Accept the passkey if the accept button was pressed
+//         }
+
+//         if (buttons & KEY_PASSKEY_REJECT) {
+//             num_comp_reply(false); // Reject the passkey if the reject button was pressed
+//         }
+//     }
+// }
+#endif /* CONFIG_BT_NUS_SECURITY_ENABLED */
+
+// static void configure_gpio(void)
+// {
+//     int err;
+
+// #ifdef CONFIG_BT_NUS_SECURITY_ENABLED
+//     err = dk_buttons_init(button_changed); // Initialize buttons with the button_changed callback if security is enabled
+//     if (err) {
+//         LOG_ERR("Cannot init buttons (err: %d)", err); // Log an error if button initialization fails
+//     }
+// #endif /* CONFIG_BT_NUS_SECURITY_ENABLED */
+
+//     err = dk_leds_init(); // Initialize LEDs
+//     if (err) {
+//         LOG_ERR("Cannot init LEDs (err: %d)", err); // Log an error if LED initialization fails
+//     }
+// }
+
+void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
     if (auth_conn) {
-        if (buttons & KEY_PASSKEY_ACCEPT) {
-            num_comp_reply(true); // Accept the passkey if the accept button was pressed
-        }
-
-        if (buttons & KEY_PASSKEY_REJECT) {
-            num_comp_reply(false); // Reject the passkey if the reject button was pressed
-        }
-    }
-}
-#endif /* CONFIG_BT_NUS_SECURITY_ENABLED */
-
-static void configure_gpio(void)
-{
-    int err;
-
-#ifdef CONFIG_BT_NUS_SECURITY_ENABLED
-    err = dk_buttons_init(button_changed); // Initialize buttons with the button_changed callback if security is enabled
-    if (err) {
-        LOG_ERR("Cannot init buttons (err: %d)", err); // Log an error if button initialization fails
-    }
-#endif /* CONFIG_BT_NUS_SECURITY_ENABLED */
-
-    err = dk_leds_init(); // Initialize LEDs
-    if (err) {
-        LOG_ERR("Cannot init LEDs (err: %d)", err); // Log an error if LED initialization fails
-    }
+		auth_btn_sw2_clicked++;
+	}
 }
 
 // **********************************************************
@@ -299,9 +317,19 @@ int main(void)
     int blink_status = 0; // Variable to keep track of LED blink status
     int err = 0; // Variable to store error codes
 
-    configure_gpio(); // Configure GPIOs (buttons and LEDs)
+    // configure_gpio(); // Configure GPIOs (buttons and LEDs)
     fb_init(); // Initialize the framebuffer
     fb_v_measure_select(V_CAP); // Select the voltage measurement
+
+    err = gpio_pin_configure_dt(&button, GPIO_INPUT);
+	if (err) {
+		LOG_ERR("Button configuration failed (err %d)\n", err);
+		return 0;
+	}
+
+	gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE);
+	gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin)); 
+	gpio_add_callback(button.port, &button_cb_data);
 
     if (IS_ENABLED(CONFIG_BT_NUS_SECURITY_ENABLED)) {
         err = bt_conn_auth_cb_register(&conn_auth_callbacks); // Register authentication callbacks if security is enabled
@@ -343,7 +371,7 @@ int main(void)
     }
 
     for (;;) {
-        dk_set_led(RUN_STATUS_LED, (++blink_status) % 2); // Toggle the status LED
+        fb_set_led(LED2); // Toggle the status LED
         k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL)); // Sleep for the blink interval
     }
     return 0; // Return 0 (though this line is never reached due to the infinite loop)

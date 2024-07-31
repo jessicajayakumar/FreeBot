@@ -17,6 +17,7 @@
         "usb_device.h": "c",
         "uuid.h": "c",
         "bluetooth.h": "c",
-        "dk_buttons_and_leds.h": "c"
+        "dk_buttons_and_leds.h": "c",
+        "fb_motor.h": "c"
     }
 }
