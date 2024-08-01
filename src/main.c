@@ -397,7 +397,7 @@ void ble_write_thread(void)
 
 		uint32_t current_time = k_uptime_get_32();
 
-		if ((current_time - last_voltage_send_time) >= 10000) {
+		if ((current_time - last_voltage_send_time) >= 1000) {
 			int v_cap = fb_v_measure();
 			LOG_INF("Voltage: %d", v_cap);
 			uint8_t volt_val=(v_cap*100)/3000;

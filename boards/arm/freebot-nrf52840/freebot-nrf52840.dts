@@ -14,6 +14,7 @@
         zephyr,sram = &sram0;
         zephyr,flash = &flash0;
         zephyr,code-partition = &slot0_partition;
+        
     };
 
     leds {
@@ -72,6 +73,11 @@
         vout-enable-gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
     };
 };
+
+&uicr {
+    nfct-pins-as-gpios;
+};
+
 
 &gpiote {
     status = "okay";
@@ -196,9 +202,9 @@
 	status = "disabled";
 };
 
-// &cryptocell {
-// 	status = "disabled";
-// };
+&cryptocell {
+	status = "okay";
+};
 
 &ecb {
 	status = "disabled";
