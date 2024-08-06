@@ -89,7 +89,7 @@ static const struct bt_data sd[] = {
 
 int auth_btn_sw2_clicked;
 
-uint8_t FB_ID = 0x02; // hex for decimal 2
+uint8_t FB_ID = 0x31; // hex for decimal 49
 
 // **********************************************************
 // BLE Connection and configuration
@@ -392,14 +392,14 @@ void ble_write_thread(void)
 	};
 
 	uint32_t last_voltage_send_time = k_uptime_get_32();
-    k_msleep(10000);
+    k_msleep(8000);
 
 	
     for (;;) {
 
 		uint32_t current_time = k_uptime_get_32();
 
-		if ((current_time - last_voltage_send_time) >= 1000) {
+		if ((current_time - last_voltage_send_time) >= 2000) {
 			int v_cap = fb_v_measure();
 			LOG_INF("Voltage: %d", v_cap);
 			uint8_t volt_val=(v_cap*100)/3000;
