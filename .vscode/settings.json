@@ -18,6 +18,9 @@
         "uuid.h": "c",
         "bluetooth.h": "c",
         "dk_buttons_and_leds.h": "c",
-        "fb_motor.h": "c"
+        "fb_motor.h": "c",
+        "hci.h": "c",
+        "hci_types.h": "c",
+        "addr.h": "c"
     }
 }

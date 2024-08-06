@@ -89,6 +89,8 @@ static const struct bt_data sd[] = {
 
 int auth_btn_sw2_clicked;
 
+uint8_t FB_ID = 0x02; // hex for decimal 2
+
 // **********************************************************
 // BLE Connection and configuration
 // **********************************************************
@@ -318,7 +320,7 @@ int main(void)
     int err = 0; // Variable to store error codes
 
     // configure_gpio(); // Configure GPIOs (buttons and LEDs)
-    fb_init(); // Initialize the framebuffer
+    fb_init(); // Initialize the FB API
     fb_v_measure_select(V_CAP); // Select the voltage measurement
 
     err = gpio_pin_configure_dt(&button, GPIO_INPUT);
@@ -402,7 +404,7 @@ void ble_write_thread(void)
 			LOG_INF("Voltage: %d", v_cap);
 			uint8_t volt_val=(v_cap*100)/3000;
 
-			uint8_t msg[] = {volt_val}; // Example data
+			uint8_t msg[] = {FB_ID, volt_val}; // Voltage
 			size_t msg_len = sizeof(msg);
 
 			int loc = 0;
@@ -439,8 +441,8 @@ void ble_write_thread(void)
 		
 		}
 
-		fb_straight_forw();
-        // Short sleep to prevent busy-waiting and allow other threads to run
+		// fb_straight_forw();
+        // // Short sleep to prevent busy-waiting and allow other threads to run
         k_msleep(10);
 
 	}
