@@ -8,6 +8,10 @@
  *  @brief Nordic UART Bridge Service (NUS) sample
  */
 
+//********************************************************************************
+// Including header files
+//********************************************************************************
+
 #include <zephyr/types.h> // Include Zephyr type definitions
 #include <zephyr/kernel.h> // Include Zephyr kernel functions and macros
 #include <zephyr/usb/usb_device.h> // Include USB device support
@@ -36,7 +40,9 @@
 
 #include "freebot.h" // Include FreeBot header file that includes the various FreeBot modules
 
-static bool data_received = false; // Flag to indicate if data has been received
+//********************************************************************************
+// Defining macros
+//********************************************************************************
 
 #define LOG_MODULE_NAME freebot_uart // Define the log module name
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module with debug level
@@ -47,10 +53,11 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME // Define the Bluetooth device name
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1) // Calculate the length of the device name
 
-// #define RUN_STATUS_LED DK_LED1 // Define the LED for run status
 #define RUN_LED_BLINK_INTERVAL 1000 // Define the blink interval for the run status LED in milliseconds
 
-// #define CON_STATUS_LED DK_LED2 // Define the LED for connection status
+//********************************************************************************
+// Defining FB controls
+//********************************************************************************
 
 #define LED1 D15 // Define the pin for LED1
 #define LED2 D16 // Define the pin for LED2
@@ -59,20 +66,28 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module 
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(SW2_NODE, gpios);
 static struct gpio_callback button_cb_data;
 
-// #define KEY_PASSKEY_ACCEPT DK_BTN1_MSK // Define the button mask for passkey accept
-// #define KEY_PASSKEY_REJECT DK_BTN2_MSK // Define the button mask for passkey reject
 
 #define UART_BUF_SIZE CONFIG_BT_NUS_UART_BUFFER_SIZE // Define the UART buffer size
 #define UART_WAIT_FOR_BUF_DELAY K_MSEC(50) // Define the delay for waiting for UART buffer in milliseconds
 #define UART_WAIT_FOR_RX CONFIG_BT_NUS_UART_RX_WAIT_TIME // Define the wait time for UART RX
 
 static K_SEM_DEFINE(ble_init_ok, 0, 1); // Define and initialize a semaphore for BLE initialization
+
+//********************************************************************************
+// Function variable declarations
+//********************************************************************************
+
 struct k_timer voltage_timer; // Declare a timer for voltage measurement
 
 static struct bt_conn *current_conn; // Pointer to the current Bluetooth connection
 static struct bt_conn *auth_conn; // Pointer to the Bluetooth connection for authentication
 
 struct nus_data {
+    uint8_t data[256]; // Buffer to hold data
+    size_t len; // Length of the data
+};
+
+struct msg_data{
     uint8_t data[256]; // Buffer to hold data
     size_t len; // Length of the data
 };
@@ -87,8 +102,24 @@ static const struct bt_data sd[] = {
 };
 
 
+// Maximum value returned by rand() function
+#define RAND_MAX K_MSEC(1600)
+
+static bool data_received = false; // Flag to indicate if data has been received
+static bool voltage_send = true; // Flag to indicate if voltage should be sent
+
+static uint32_t volt_delay = 1000; // Voltage send delay
+
 int auth_btn_sw2_clicked;
 
+int handle_msg(struct bt_conn *conn, const uint8_t *const data,
+              uint16_t len);
+    
+int change_param( struct msg_data msg_received);
+
+// ***************************************************************************************************
+// FreeBot ID - Change this to the ID of your FreeBot, and change the name in the prj.conf file
+// ***************************************************************************************************
 uint8_t FB_ID = 0x31; // hex for decimal 49
 
 // **********************************************************
@@ -223,6 +254,10 @@ static struct bt_conn_auth_cb conn_auth_callbacks; // Define an empty structure 
 static struct bt_conn_auth_info_cb conn_auth_info_callbacks; // Define an empty structure for authentication info callbacks
 #endif
 
+// **********************************************************
+// BLE data receive
+// **********************************************************
+
 static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
               uint16_t len)
 {
@@ -237,9 +272,71 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
     for (uint16_t i = 0; i < len; i++) {
         LOG_INF("0x%02x ", data[i]); // Log each byte of the received data in hexadecimal format
     }
-    
+    handle_msg(conn, data, len); // Call the function to handle the received message
     data_received = true; // Set the flag indicating that data has been received
 }
+
+// Function to process messages received over BLE
+int handle_msg(struct bt_conn *conn, const uint8_t *const data,
+              uint16_t len){
+    
+    struct msg_data msg_received;
+    msg_received.len = len;
+    memcpy(msg_received.data, data, len);
+
+    LOG_INF("Data received");
+
+    // check the first byte of the message
+    switch (msg_received.data[0])
+    {
+        case 0x30:
+            LOG_INF("Change param message received");
+            change_param(msg_received);
+            break;
+        
+        case 0x31:
+            LOG_INF("Message from peer received");
+            break;
+        
+    }
+    return 0;
+}
+
+// Function to change the parameters of the FreeBot based on message received over BLE
+int change_param( struct msg_data msg_received){
+    // check the second byte of the message
+    switch (msg_received.data[1])
+    {
+        case 0x30:
+            LOG_INF("Change voltage send delay received");
+            // Copy the delay value from the message, starting from the third byte
+            memcpy(&volt_delay, &msg_received.data[2], sizeof(volt_delay));
+            LOG_INF("Voltage send delay: %d", volt_delay);
+            volt_delay = volt_delay * 1000; // Convert the delay to milliseconds
+            break;
+        
+        case 0x31:
+            LOG_INF("Change movement flag received");
+            break;
+
+        case 0x32:
+            LOG_INF("Change random movement request received");
+            break;
+        
+        case 0x33:
+            LOG_INF("Voltage send off received");
+            voltage_send = false;
+            break;
+        
+        case 0x34:
+            LOG_INF("Voltage send on received");
+            voltage_send = true;
+            break;
+    }
+    return 0;
+
+}
+
 
 static struct bt_nus_cb nus_cb = {
     .received = bt_receive_cb, // Set the callback for receiving data
@@ -269,39 +366,7 @@ static void num_comp_reply(bool accept)
     bt_conn_unref(auth_conn); // Unreference the connection
     auth_conn = NULL; // Set the connection reference to NULL
 }
-
-// void button_changed(uint32_t button_state, uint32_t has_changed)
-// {
-//     uint32_t buttons = button_state & has_changed; // Determine which buttons have changed state
-
-//     if (auth_conn) {
-//         if (buttons & KEY_PASSKEY_ACCEPT) {
-//             num_comp_reply(true); // Accept the passkey if the accept button was pressed
-//         }
-
-//         if (buttons & KEY_PASSKEY_REJECT) {
-//             num_comp_reply(false); // Reject the passkey if the reject button was pressed
-//         }
-//     }
-// }
 #endif /* CONFIG_BT_NUS_SECURITY_ENABLED */
-
-// static void configure_gpio(void)
-// {
-//     int err;
-
-// #ifdef CONFIG_BT_NUS_SECURITY_ENABLED
-//     err = dk_buttons_init(button_changed); // Initialize buttons with the button_changed callback if security is enabled
-//     if (err) {
-//         LOG_ERR("Cannot init buttons (err: %d)", err); // Log an error if button initialization fails
-//     }
-// #endif /* CONFIG_BT_NUS_SECURITY_ENABLED */
-
-//     err = dk_leds_init(); // Initialize LEDs
-//     if (err) {
-//         LOG_ERR("Cannot init LEDs (err: %d)", err); // Log an error if LED initialization fails
-//     }
-// }
 
 void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -380,7 +445,7 @@ int main(void)
 }
 
 // **********************************************************
-// BLE thread
+// BLE voltage measurement thread
 // **********************************************************
 
 void ble_write_thread(void)
@@ -397,53 +462,54 @@ void ble_write_thread(void)
 	
     for (;;) {
 
-		uint32_t current_time = k_uptime_get_32();
+		if (voltage_send){
+            uint32_t current_time = k_uptime_get_32();
 
-		if ((current_time - last_voltage_send_time) >= 2000) {
-			int v_cap = fb_v_measure();
-			LOG_INF("Voltage: %d", v_cap);
-			uint8_t volt_val=(v_cap*100)/3000;
+            if ((current_time - last_voltage_send_time) >= volt_delay) {
+                int v_cap = fb_v_measure();
+                LOG_INF("Voltage: %d", v_cap);
+                uint8_t volt_val=(v_cap*100)/3000;
 
-			uint8_t msg[] = {FB_ID, volt_val}; // Voltage
-			size_t msg_len = sizeof(msg);
+                uint8_t msg[] = {FB_ID, volt_val}; // Voltage
+                size_t msg_len = sizeof(msg);
 
-			int loc = 0;
+                int loc = 0;
 
-			int plen = MIN(sizeof(data.data) - data.len, msg_len);
+                int plen = MIN(sizeof(data.data) - data.len, msg_len);
 
-			if (plen>0){
+                if (plen>0){
 
-				for (int i = 0; i < plen; i++) {
-				LOG_INF("Data to be sent over BLE: %d", msg[loc]);
-				}
+                    for (int i = 0; i < plen; i++) {
+                    LOG_INF("Data to be sent over BLE: %d", msg[loc]);
+                    }
 
-				memcpy(&data.data[data.len], &msg[loc], plen);
-				data.len += plen;
-				loc += plen;
+                    memcpy(&data.data[data.len], &msg[loc], plen);
+                    data.len += plen;
+                    loc += plen;
 
-				for (int i = 0; i < data.len; i++) {
-					LOG_INF("Data to be sent over BLE: %d", data.data[i]);
-				}
-				LOG_INF("Data length: %d", data.len);
+                    for (int i = 0; i < data.len; i++) {
+                        LOG_INF("Data to be sent over BLE: %d", data.data[i]);
+                    }
+                    LOG_INF("Data length: %d", data.len);
 
-				if (data.len >= sizeof(data.data) || loc >= msg_len) {
-					if (bt_nus_send(NULL, data.data, data.len)) {
-						LOG_WRN("Failed to send data over BLE connection");
-					}
-					LOG_INF("data sent over BLE");
-					data.len = 0;
-				}
+                    if (data.len >= sizeof(data.data) || loc >= msg_len) {
+                        if (bt_nus_send(NULL, data.data, data.len)) {
+                            LOG_WRN("Failed to send data over BLE connection");
+                        }
+                        LOG_INF("data sent over BLE");
+                        data.len = 0;
+                    }
 
-				plen = MIN(sizeof(data.data), msg_len - loc);
-				last_voltage_send_time = current_time;
-					
-			}
-		
-		}
+                    plen = MIN(sizeof(data.data), msg_len - loc);
+                    last_voltage_send_time = current_time;
+                        
+                }
+            
+            }
 
-		// fb_straight_forw();
-        // // Short sleep to prevent busy-waiting and allow other threads to run
-        k_msleep(10);
+            // // Short sleep to prevent busy-waiting and allow other threads to run
+            k_msleep(10);
+        }
 
 	}
 	
@@ -452,5 +518,13 @@ void ble_write_thread(void)
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
 		NULL, PRIORITY, 0, 0);
+
+// **********************************************************
+// BLE motor control thread
+// **********************************************************
+
+void ble_motor_control(void){
+
+}
 
                           
