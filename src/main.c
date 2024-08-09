@@ -88,7 +88,7 @@ struct nus_data {
 };
 
 struct msg_data{
-    int data[256]; // Buffer to hold data
+    uint8_t data[256]; // Buffer to hold data
     size_t len; // Length of the data
 };
 
@@ -266,12 +266,12 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr)); // Convert the Bluetooth address to a string
 
-    LOG_INF("Received data from: %s", addr); // Log the address of the device that sent the data
-    LOG_INF("data received: %d", len); // Log the length of the received data
-    LOG_INF("Data received:");
-    for (uint16_t i = 0; i < len; i++) {
-        LOG_INF("0x%02x ", data[i]); // Log each byte of the received data in hexadecimal format
-    }
+    // LOG_INF("Received data from: %s", addr); // Log the address of the device that sent the data
+    // LOG_INF("data received: %d", len); // Log the length of the received data
+    // LOG_INF("Data received:");
+    // for (uint16_t i = 0; i < len; i++) {
+    //     LOG_INF("0x%02x ", data[i]); // Log each byte of the received data in hexadecimal format
+    // }
 
     data_received = true; // Set the flag indicating that data has been received
     handle_msg(conn, data, len); // Call the function to handle the received message
@@ -283,9 +283,13 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     
     struct msg_data msg_received;
     msg_received.len = len;
-    memcpy(msg_received.data, data, len);
+    memcpy(msg_received.data, (int*) data, len);
 
     LOG_INF("Data received");
+    // print the received data
+    for (uint16_t i = 0; i < len; i++) {
+        LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
+    }
 
     // check the first byte of the message
     switch (msg_received.data[0])
