@@ -88,7 +88,7 @@ struct nus_data {
 };
 
 struct msg_data{
-    uint8_t data[256]; // Buffer to hold data
+    int data[256]; // Buffer to hold data
     size_t len; // Length of the data
 };
 
@@ -272,8 +272,9 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
     for (uint16_t i = 0; i < len; i++) {
         LOG_INF("0x%02x ", data[i]); // Log each byte of the received data in hexadecimal format
     }
-    handle_msg(conn, data, len); // Call the function to handle the received message
+
     data_received = true; // Set the flag indicating that data has been received
+    handle_msg(conn, data, len); // Call the function to handle the received message
 }
 
 // Function to process messages received over BLE
@@ -289,12 +290,12 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     // check the first byte of the message
     switch (msg_received.data[0])
     {
-        case 0x30:
+        case 0x01:
             LOG_INF("Change param message received");
             change_param(msg_received);
             break;
         
-        case 0x31:
+        case 0x02:
             LOG_INF("Message from peer received");
             break;
         
@@ -307,30 +308,33 @@ int change_param( struct msg_data msg_received){
     // check the second byte of the message
     switch (msg_received.data[1])
     {
-        case 0x30:
+        case 0x01:
+            LOG_INF("STOP received");
+            break;
+        
+        case 0x02:
+            LOG_INF("START received");
+            break;
+
+        case 0x03:
+            LOG_INF("Voltage send off received");
+            voltage_send = false;
+            break;
+        case 0x04:
+            LOG_INF("Voltage send on received");
+            voltage_send = true;
+            break;
+        
+        case 0x05:
             LOG_INF("Change voltage send delay received");
             // Copy the delay value from the message, starting from the third byte
             memcpy(&volt_delay, &msg_received.data[2], sizeof(volt_delay));
             LOG_INF("Voltage send delay: %d", volt_delay);
             volt_delay = volt_delay * 1000; // Convert the delay to milliseconds
             break;
-        
-        case 0x31:
-            LOG_INF("Change movement flag received");
-            break;
-
-        case 0x32:
-            LOG_INF("Change random movement request received");
-            break;
-        
-        case 0x33:
-            LOG_INF("Voltage send off received");
-            voltage_send = false;
-            break;
-        
-        case 0x34:
-            LOG_INF("Voltage send on received");
-            voltage_send = true;
+            
+        case 0x06:
+            LOG_INF("Message from peer received");
             break;
     }
     return 0;
@@ -467,7 +471,7 @@ void ble_write_thread(void)
 
             if ((current_time - last_voltage_send_time) >= volt_delay) {
                 int v_cap = fb_v_measure();
-                LOG_INF("Voltage: %d", v_cap);
+                //LOG_INF("Voltage: %d", v_cap);
                 uint8_t volt_val=(v_cap*100)/3000;
 
                 uint8_t msg[] = {FB_ID, volt_val}; // Voltage
@@ -480,7 +484,7 @@ void ble_write_thread(void)
                 if (plen>0){
 
                     for (int i = 0; i < plen; i++) {
-                    LOG_INF("Data to be sent over BLE: %d", msg[loc]);
+                    //LOG_INF("Data to be sent over BLE: %d", msg[loc]);
                     }
 
                     memcpy(&data.data[data.len], &msg[loc], plen);
@@ -488,15 +492,15 @@ void ble_write_thread(void)
                     loc += plen;
 
                     for (int i = 0; i < data.len; i++) {
-                        LOG_INF("Data to be sent over BLE: %d", data.data[i]);
+                        //LOG_INF("Data to be sent over BLE: %d", data.data[i]);
                     }
-                    LOG_INF("Data length: %d", data.len);
+                    //LOG_INF("Data length: %d", data.len);
 
                     if (data.len >= sizeof(data.data) || loc >= msg_len) {
                         if (bt_nus_send(NULL, data.data, data.len)) {
                             LOG_WRN("Failed to send data over BLE connection");
                         }
-                        LOG_INF("data sent over BLE");
+                        //LOG_INF("data sent over BLE");
                         data.len = 0;
                     }
 
