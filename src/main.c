@@ -35,6 +35,7 @@
 
 #include <stdio.h> // Include standard I/O functions
 #include <string.h> // Include string manipulation functions
+#include <stdlib.h> // Include standard library functions
 
 #include <zephyr/logging/log.h> // Include Zephyr logging APIs
 
@@ -45,10 +46,11 @@
 //********************************************************************************
 
 #define LOG_MODULE_NAME freebot_uart // Define the log module name
-LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module with debug level
+LOG_MODULE_REGISTER(LOG_MODULE_NAME); // Register the log module with debug level
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE // Define the stack size for the thread
-#define PRIORITY 7 // Define the thread priority
+#define VOLT_PRIORITY -2 // Define the thread priority
+#define MOVE_PRIORITY -2 // Define the thread priority for motor control
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME // Define the Bluetooth device name
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1) // Calculate the length of the device name
@@ -89,7 +91,7 @@ struct nus_data {
 
 struct msg_data{
     uint8_t data[256]; // Buffer to hold data
-    size_t len; // Length of the data
+    uint16_t len; // Length of the data
 };
 
 static const struct bt_data ad[] = {
@@ -102,13 +104,14 @@ static const struct bt_data sd[] = {
 };
 
 
-// Maximum value returned by rand() function
-#define RAND_MAX K_MSEC(1600)
 
 static bool data_received = false; // Flag to indicate if data has been received
 static bool voltage_send = true; // Flag to indicate if voltage should be sent
+static bool move = false; // Flag to indicate if the FreeBot should move
 
-static uint32_t volt_delay = 1000; // Voltage send delay
+static bool connection_made = false; // Flag to indicate if a connection is established
+
+uint32_t volt_delay = 100000; // Voltage send delay
 
 int auth_btn_sw2_clicked;
 
@@ -117,10 +120,33 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     
 int change_param( struct msg_data msg_received);
 
+void clear_buffer(uint8_t *buffer, size_t size);
+
+// **********************************************************
+// FreeBot motion control
+// **********************************************************
+
+typedef enum{
+    STOP = 0,
+    FORWARD,
+    ROTATE_CW ,
+    ROTATE_CCW,
+} motion_t;
+
+motion_t current_motion = STOP;
+uint32_t last_motion_update = 0;
+uint32_t timesToTurn=0;
+uint32_t timesToFW=0;
+
+uint32_t STRAIGHT_RAND_TIME = 5000;
+uint32_t ROTATE_RAND_TIME = 1000;
+
+void set_motion(motion_t motion);
+
 // ***************************************************************************************************
 // FreeBot ID - Change this to the ID of your FreeBot, and change the name in the prj.conf file
 // ***************************************************************************************************
-uint8_t FB_ID = 0x31; // hex for decimal 49
+uint8_t FB_ID = 0x31; // hex for decimal 48
 
 // **********************************************************
 // BLE Connection and configuration
@@ -140,6 +166,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
     LOG_INF("Connected %s", addr); // Log the successful connection with the address
 
     current_conn = bt_conn_ref(conn); // Reference the current connection to keep it active
+
+    connection_made=true;
 
     fb_set_led(LED1); // Turn on the connection status LED
 }
@@ -258,6 +286,10 @@ static struct bt_conn_auth_info_cb conn_auth_info_callbacks; // Define an empty 
 // BLE data receive
 // **********************************************************
 
+void clear_buffer(uint8_t *buffer, size_t size) {
+    memset(buffer, 0, size);
+}
+
 static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
               uint16_t len)
 {
@@ -283,7 +315,11 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     
     struct msg_data msg_received;
     msg_received.len = len;
-    memcpy(msg_received.data, (int*) data, len);
+    uint32_t volt_delay;
+
+    clear_buffer(msg_received.data, sizeof(msg_received.data));
+
+    memcpy(msg_received.data, data, len);
 
     LOG_INF("Data received");
     // print the received data
@@ -294,57 +330,42 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     // check the first byte of the message
     switch (msg_received.data[0])
     {
-        case 0x01:
-            LOG_INF("Change param message received");
-            change_param(msg_received);
-            break;
-        
-        case 0x02:
-            LOG_INF("Message from peer received");
-            break;
-        
-    }
-    return 0;
-}
-
-// Function to change the parameters of the FreeBot based on message received over BLE
-int change_param( struct msg_data msg_received){
-    // check the second byte of the message
-    switch (msg_received.data[1])
-    {
-        case 0x01:
+        case 0x61:
             LOG_INF("STOP received");
+            move = false;
             break;
         
-        case 0x02:
+        case 0x62:
             LOG_INF("START received");
+            move = true;
             break;
 
-        case 0x03:
-            LOG_INF("Voltage send off received");
+        case 0x63:
+            LOG_INF("Voltage send stop received");
             voltage_send = false;
             break;
-        case 0x04:
-            LOG_INF("Voltage send on received");
+
+        case 0x64:
+            LOG_INF("Voltage send stop received");
             voltage_send = true;
             break;
-        
-        case 0x05:
-            LOG_INF("Change voltage send delay received");
-            // Copy the delay value from the message, starting from the third byte
-            memcpy(&volt_delay, &msg_received.data[2], sizeof(volt_delay));
-            LOG_INF("Voltage send delay: %d", volt_delay);
+
+        case 0x65:
+            LOG_INF("Voltage send delay change received");
+            // Copy the delay value from the message, only the second byte
+            memcpy(&volt_delay, &msg_received.data[1], 1);
             volt_delay = volt_delay * 1000; // Convert the delay to milliseconds
+            LOG_INF("Voltage send delay updated: %d", volt_delay);
             break;
-            
-        case 0x06:
+
+        case 0x66:
             LOG_INF("Message from peer received");
             break;
+        
     }
     return 0;
 
 }
-
 
 static struct bt_nus_cb nus_cb = {
     .received = bt_receive_cb, // Set the callback for receiving data
@@ -395,6 +416,7 @@ int main(void)
     // configure_gpio(); // Configure GPIOs (buttons and LEDs)
     fb_init(); // Initialize the FB API
     fb_v_measure_select(V_CAP); // Select the voltage measurement
+    fb_motor_init(); // Initialize the motor
 
     err = gpio_pin_configure_dt(&button, GPIO_INPUT);
 	if (err) {
@@ -445,6 +467,9 @@ int main(void)
         return 0; // Exit the program
     }
 
+    set_motion(FORWARD);
+    move = false;
+
     for (;;) {
         fb_set_led(LED2); // Toggle the status LED
         k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL)); // Sleep for the blink interval
@@ -456,6 +481,193 @@ int main(void)
 // BLE voltage measurement thread
 // **********************************************************
 
+
+
+// void ble_write_thread(void)
+// {
+// 	/* Don't go any further until BLE is initialized */
+// 	k_sem_take(&ble_init_ok, K_FOREVER);
+// 	struct nus_data data={
+// 		.len = 0,
+// 	};
+    
+    
+//     uint32_t volt_delay=1000;
+//     uint32_t last_voltage_send_time = k_uptime_get_32();
+//     k_msleep(8000);
+
+    
+//     for (;;) {
+
+//         if (voltage_send){
+//             uint32_t current_time = k_uptime_get_32();
+
+//             if ((current_time - last_voltage_send_time) >= volt_delay) {
+//                 int v_cap = fb_v_measure();
+//                 //LOG_INF("Voltage: %d", v_cap);
+//                 uint8_t volt_val=(v_cap*100)/3000;
+
+//                 uint8_t msg[] = {FB_ID, volt_val}; // Voltage
+//                 size_t msg_len = sizeof(msg);
+
+//                 int loc = 0;
+
+//                 int plen = MIN(sizeof(data.data) - data.len, msg_len);
+
+//                 if (plen>0){
+
+//                     for (int i = 0; i < plen; i++) {
+//                     //LOG_INF("Data to be sent over BLE: %d", msg[loc]);
+//                     }
+
+//                     memcpy(&data.data[data.len], &msg[loc], plen);
+//                     data.len += plen;
+//                     loc += plen;
+
+//                     for (int i = 0; i < data.len; i++) {
+//                         //LOG_INF("Data to be sent over BLE: %d", data.data[i]);
+//                     }
+//                     //LOG_INF("Data length: %d", data.len);
+
+//                     if (data.len >= sizeof(data.data) || loc >= msg_len) {
+//                         if (bt_nus_send(NULL, data.data, data.len)) {
+//                             LOG_WRN("Failed to send data over BLE connection");
+//                         }
+//                         //LOG_INF("data sent over BLE");
+//                         data.len = 0;
+//                     }
+
+//                     plen = MIN(sizeof(data.data), msg_len - loc);
+//                     last_voltage_send_time = current_time;
+                        
+//                 }
+            
+//             }
+
+//             // // Short sleep to prevent busy-waiting and allow other threads to run
+//             k_msleep(10);
+//         }
+
+//     }
+    
+	
+// }
+
+
+// K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
+// 		NULL, VOLT_PRIORITY, 0, 0);
+
+// // **********************************************************
+// // BLE motor control thread
+// // **********************************************************
+
+// void set_motion(motion_t motion){
+//     LOG_INF("Am setting motion : %d", motion);
+//     if (current_motion != motion){
+//         current_motion = motion;
+    
+//         if (current_motion==STOP){
+//             fb_stop();
+//         }
+//         else if (current_motion==FORWARD){
+//             fb_straight_forw();
+//         }
+//         else if (current_motion==ROTATE_CW){
+//             fb_rotate_cw();
+//         }
+//         else if (current_motion==ROTATE_CCW){
+//             fb_rotate_ccw();
+//         }
+//     }
+//     else{
+//         return;
+//     }
+
+// }
+
+
+// void ble_motor_control(void){
+//         /* Don't go any further until BLE is initialized */
+// 	k_sem_take(&ble_init_ok, K_FOREVER);
+
+//     uint32_t last_motion_update = k_uptime_get_32();
+
+//     for (;;){
+//         //LOG_INF("BLE motor control thread, waiting to move");
+
+//         if (move){
+            
+//             LOG_INF("Moving, current motion: %d", current_motion);
+
+//             uint32_t current_motion_time = k_uptime_get_32();
+
+//             switch( current_motion ) {
+//                 case ROTATE_CW:
+//                 case ROTATE_CCW:
+//                     LOG_INF("Rotating, CCW");
+//                     if( current_motion_time - last_motion_update  >= timesToTurn ) {
+//                         last_motion_update = current_motion_time;
+//                         set_motion(FORWARD);
+//                         timesToFW = (rand()%STRAIGHT_RAND_TIME) + 1;
+//                     }
+//                     break;
+//                 case FORWARD:
+//                     LOG_INF("Moving forward");
+//                     if( current_motion_time - last_motion_update >= timesToFW  ) {
+//                         last_motion_update = current_motion_time;
+//                         if( rand()%2 ) {
+//                             set_motion(ROTATE_CW);
+//                         }
+//                         else {
+//                             set_motion(ROTATE_CCW);
+//                         }
+//                         timesToTurn = (rand()%ROTATE_RAND_TIME) + 1;
+//                     }
+//                     break;
+//                 case STOP:
+
+//                 default:
+//                     set_motion(STOP);
+//             }
+//             k_msleep(10);
+
+//         }
+//         else{
+//             set_motion(STOP);
+//         }
+//         k_msleep(10);
+//     }
+    
+// }
+
+// K_THREAD_DEFINE(ble_motor_control_id, STACKSIZE, ble_motor_control, NULL, NULL,
+// 		NULL, MOVE_PRIORITY, 0, 0);                          
+
+
+void set_motion(motion_t motion){
+    LOG_INF("Am setting motion : %d", motion);
+    if (current_motion != motion){
+        current_motion = motion;
+    
+        if (current_motion==STOP){
+            fb_stop();
+        }
+        else if (current_motion==FORWARD){
+            fb_straight_forw();
+        }
+        else if (current_motion==ROTATE_CW){
+            fb_rotate_cw();
+        }
+        else if (current_motion==ROTATE_CCW){
+            fb_rotate_ccw();
+        }
+    }
+    else{
+        return;
+    }
+
+}
+
 void ble_write_thread(void)
 {
 	/* Don't go any further until BLE is initialized */
@@ -463,15 +675,19 @@ void ble_write_thread(void)
 	struct nus_data data={
 		.len = 0,
 	};
-
-	uint32_t last_voltage_send_time = k_uptime_get_32();
+    
+    
+    uint32_t volt_delay=1000;
+    uint32_t last_voltage_send_time = k_uptime_get_32();
+    uint32_t last_motion_update = k_uptime_get_32();
     k_msleep(8000);
 
-	
+    
     for (;;) {
 
-		if (voltage_send){
-            uint32_t current_time = k_uptime_get_32();
+        uint32_t current_time = k_uptime_get_32();
+
+        if (voltage_send){
 
             if ((current_time - last_voltage_send_time) >= volt_delay) {
                 int v_cap = fb_v_measure();
@@ -514,25 +730,53 @@ void ble_write_thread(void)
                 }
             
             }
-
-            // // Short sleep to prevent busy-waiting and allow other threads to run
-            k_msleep(10);
         }
 
-	}
+
+        if (move){
+            
+            LOG_INF("Moving, current motion: %d", current_motion);
+
+
+            switch( current_motion ) {
+                case ROTATE_CW:
+                case ROTATE_CCW:
+                    LOG_INF("Rotating, CCW");
+                    if( current_time - last_motion_update  >= timesToTurn ) {
+                        last_motion_update = current_time;
+                        set_motion(FORWARD);
+                        timesToFW = (rand()%STRAIGHT_RAND_TIME) + 1;
+                    }
+                    break;
+                case FORWARD:
+                    LOG_INF("Moving forward");
+                    if( current_time - last_motion_update >= timesToFW  ) {
+                        last_motion_update = current_time;
+                        if( rand()%2 ) {
+                            set_motion(ROTATE_CW);
+                        }
+                        else {
+                            set_motion(ROTATE_CCW);
+                        }
+                        timesToTurn = (rand()%ROTATE_RAND_TIME) + 1;
+                    }
+                    break;
+                case STOP:
+
+                default:
+                    set_motion(STOP);
+            }
+
+        }
+        
+        // // Short sleep to prevent busy-waiting and allow other threads to run
+            k_msleep(10);
+
+    }
+    
 	
 }
 
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
-		NULL, PRIORITY, 0, 0);
-
-// **********************************************************
-// BLE motor control thread
-// **********************************************************
-
-void ble_motor_control(void){
-
-}
-
-                          
+		NULL, VOLT_PRIORITY, 0, 0);

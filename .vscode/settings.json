@@ -21,6 +21,7 @@
         "fb_motor.h": "c",
         "hci.h": "c",
         "hci_types.h": "c",
-        "addr.h": "c"
+        "addr.h": "c",
+        "nus.h": "c"
     }
 }
