@@ -146,7 +146,7 @@ void set_motion(motion_t motion);
 // ***************************************************************************************************
 // FreeBot ID - Change this to the ID of your FreeBot, and change the name in the prj.conf file
 // ***************************************************************************************************
-uint8_t FB_ID = 0x31; // hex for decimal 48
+uint8_t FB_ID = 0x31; // hex for decimal 49
 
 // **********************************************************
 // BLE Connection and configuration
@@ -689,6 +689,16 @@ void ble_write_thread(void)
 
         uint32_t current_time = k_uptime_get_32();
 
+        // int v_current = fb_v_measure();
+        // uint8_t volt_cur_cal=(v_current*100)/3000;
+
+        // if (volt_cur_cal <= 20){
+        //     uint8_t help[]={'99f1a'}; // array of characters 
+        //     if (bt_nus_send(NULL, help, sizeof(help))) {
+        //         LOG_WRN("Failed to send data over BLE connection");
+        //     }
+        // }
+        
         if (voltage_send){
 
             if ((current_time - last_voltage_send_time) >= volt_delay) {
