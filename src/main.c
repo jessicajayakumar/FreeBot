@@ -689,15 +689,15 @@ void ble_write_thread(void)
 
         uint32_t current_time = k_uptime_get_32();
 
-        // int v_current = fb_v_measure();
-        // uint8_t volt_cur_cal=(v_current*100)/3000;
+        int v_current = fb_v_measure();
+        uint8_t volt_cur_cal=(v_current*100)/3000;
 
-        // if (volt_cur_cal <= 20){
-        //     uint8_t help[]={'99f1a'}; // array of characters 
-        //     if (bt_nus_send(NULL, help, sizeof(help))) {
-        //         LOG_WRN("Failed to send data over BLE connection");
-        //     }
-        // }
+        if (volt_cur_cal <= 20){
+            uint8_t help[]={'99f1a'}; // array of characters 
+            if (bt_nus_send(NULL, help, sizeof(help))) {
+                LOG_WRN("Failed to send data over BLE connection");
+            }
+        }
         
         if (voltage_send){
 
