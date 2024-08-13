@@ -333,11 +333,13 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
         case 0x61:
             LOG_INF("STOP received");
             move = false;
+            set_motion(STOP);
             break;
         
         case 0x62:
             LOG_INF("START received");
             move = true;
+            set_motion(FORWARD);
             break;
 
         case 0x63:
