@@ -146,7 +146,7 @@ void set_motion(motion_t motion);
 // ***************************************************************************************************
 // FreeBot ID - Change this to the ID of your FreeBot, and change the name in the prj.conf file
 // ***************************************************************************************************
-uint8_t FB_ID = 0x31; // hex for decimal 49
+uint8_t FB_ID = 0x31; // hex for char 
 
 // **********************************************************
 // BLE Connection and configuration
