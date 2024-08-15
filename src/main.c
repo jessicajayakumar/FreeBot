@@ -46,7 +46,7 @@
 //********************************************************************************
 
 #define LOG_MODULE_NAME freebot_uart // Define the log module name
-LOG_MODULE_REGISTER(LOG_MODULE_NAME); // Register the log module with debug level
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG); // Register the log module with debug level
 
 #define STACKSIZE CONFIG_BT_NUS_THREAD_STACK_SIZE // Define the stack size for the thread
 #define VOLT_PRIORITY -2 // Define the thread priority
