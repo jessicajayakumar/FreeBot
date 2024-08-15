@@ -118,7 +118,6 @@ int auth_btn_sw2_clicked;
 int handle_msg(struct bt_conn *conn, const uint8_t *const data,
               uint16_t len);
     
-int change_param( struct msg_data msg_received);
 
 void clear_buffer(uint8_t *buffer, size_t size);
 
@@ -353,11 +352,8 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
             break;
 
         case 0x65:
-            LOG_INF("Voltage send delay change received");
-            // Copy the delay value from the message, only the second byte
-            memcpy(&volt_delay, &msg_received.data[1], 1);
-            volt_delay = volt_delay * 1000; // Convert the delay to milliseconds
-            LOG_INF("Voltage send delay updated: %d", volt_delay);
+            LOG_INF("Information received");
+            
             break;
 
         case 0x66:
