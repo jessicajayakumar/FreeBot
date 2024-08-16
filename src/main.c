@@ -297,13 +297,6 @@ static void bt_receive_cb(struct bt_conn *conn, const uint8_t *const data,
 
     bt_addr_le_to_str(bt_conn_get_dst(conn), addr, ARRAY_SIZE(addr)); // Convert the Bluetooth address to a string
 
-    // LOG_INF("Received data from: %s", addr); // Log the address of the device that sent the data
-    // LOG_INF("data received: %d", len); // Log the length of the received data
-    // LOG_INF("Data received:");
-    // for (uint16_t i = 0; i < len; i++) {
-    //     LOG_INF("0x%02x ", data[i]); // Log each byte of the received data in hexadecimal format
-    // }
-
     data_received = true; // Set the flag indicating that data has been received
     handle_msg(conn, data, len); // Call the function to handle the received message
 }
@@ -319,12 +312,6 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     clear_buffer(msg_received.data, sizeof(msg_received.data));
 
     memcpy(msg_received.data, data, len);
-
-    LOG_INF("Data received");
-    // print the received data
-    for (uint16_t i = 0; i < len; i++) {
-        LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
-    }
 
     // check the first byte of the message
     switch (msg_received.data[0])
@@ -353,7 +340,22 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
 
         case 0x65:
             LOG_INF("Information received");
+            // print the received data,
+            for (uint16_t i = 1; i < 8; i++) {
+                LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
+            }
+         
+            uint8_t x_coordinate [8]={0};
+            memcpy(&x_coordinate, &msg_received.data[1],8);
             
+            // Log each byte individually
+            for (int i = 0; i < 8; i++) {
+                LOG_INF("X coordinate byte %d: 0x%02x", i, x_coordinate[i]);
+            }
+
+            // If x_coordinate represents a string, log it as a string
+            LOG_INF("X coordinate as string: %s", x_coordinate);
+
             break;
 
         case 0x66:
@@ -472,175 +474,12 @@ int main(void)
         fb_set_led(LED2); // Toggle the status LED
         k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL)); // Sleep for the blink interval
     }
-    return 0; // Return 0 (though this line is never reached due to the infinite loop)
+    return 0; 
 }
 
 // **********************************************************
-// BLE voltage measurement thread
+// BLE voltage measurement and movement thread
 // **********************************************************
-
-
-
-// void ble_write_thread(void)
-// {
-// 	/* Don't go any further until BLE is initialized */
-// 	k_sem_take(&ble_init_ok, K_FOREVER);
-// 	struct nus_data data={
-// 		.len = 0,
-// 	};
-    
-    
-//     uint32_t volt_delay=1000;
-//     uint32_t last_voltage_send_time = k_uptime_get_32();
-//     k_msleep(8000);
-
-    
-//     for (;;) {
-
-//         if (voltage_send){
-//             uint32_t current_time = k_uptime_get_32();
-
-//             if ((current_time - last_voltage_send_time) >= volt_delay) {
-//                 int v_cap = fb_v_measure();
-//                 //LOG_INF("Voltage: %d", v_cap);
-//                 uint8_t volt_val=(v_cap*100)/3000;
-
-//                 uint8_t msg[] = {FB_ID, volt_val}; // Voltage
-//                 size_t msg_len = sizeof(msg);
-
-//                 int loc = 0;
-
-//                 int plen = MIN(sizeof(data.data) - data.len, msg_len);
-
-//                 if (plen>0){
-
-//                     for (int i = 0; i < plen; i++) {
-//                     //LOG_INF("Data to be sent over BLE: %d", msg[loc]);
-//                     }
-
-//                     memcpy(&data.data[data.len], &msg[loc], plen);
-//                     data.len += plen;
-//                     loc += plen;
-
-//                     for (int i = 0; i < data.len; i++) {
-//                         //LOG_INF("Data to be sent over BLE: %d", data.data[i]);
-//                     }
-//                     //LOG_INF("Data length: %d", data.len);
-
-//                     if (data.len >= sizeof(data.data) || loc >= msg_len) {
-//                         if (bt_nus_send(NULL, data.data, data.len)) {
-//                             LOG_WRN("Failed to send data over BLE connection");
-//                         }
-//                         //LOG_INF("data sent over BLE");
-//                         data.len = 0;
-//                     }
-
-//                     plen = MIN(sizeof(data.data), msg_len - loc);
-//                     last_voltage_send_time = current_time;
-                        
-//                 }
-            
-//             }
-
-//             // // Short sleep to prevent busy-waiting and allow other threads to run
-//             k_msleep(10);
-//         }
-
-//     }
-    
-	
-// }
-
-
-// K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
-// 		NULL, VOLT_PRIORITY, 0, 0);
-
-// // **********************************************************
-// // BLE motor control thread
-// // **********************************************************
-
-// void set_motion(motion_t motion){
-//     LOG_INF("Am setting motion : %d", motion);
-//     if (current_motion != motion){
-//         current_motion = motion;
-    
-//         if (current_motion==STOP){
-//             fb_stop();
-//         }
-//         else if (current_motion==FORWARD){
-//             fb_straight_forw();
-//         }
-//         else if (current_motion==ROTATE_CW){
-//             fb_rotate_cw();
-//         }
-//         else if (current_motion==ROTATE_CCW){
-//             fb_rotate_ccw();
-//         }
-//     }
-//     else{
-//         return;
-//     }
-
-// }
-
-
-// void ble_motor_control(void){
-//         /* Don't go any further until BLE is initialized */
-// 	k_sem_take(&ble_init_ok, K_FOREVER);
-
-//     uint32_t last_motion_update = k_uptime_get_32();
-
-//     for (;;){
-//         //LOG_INF("BLE motor control thread, waiting to move");
-
-//         if (move){
-            
-//             LOG_INF("Moving, current motion: %d", current_motion);
-
-//             uint32_t current_motion_time = k_uptime_get_32();
-
-//             switch( current_motion ) {
-//                 case ROTATE_CW:
-//                 case ROTATE_CCW:
-//                     LOG_INF("Rotating, CCW");
-//                     if( current_motion_time - last_motion_update  >= timesToTurn ) {
-//                         last_motion_update = current_motion_time;
-//                         set_motion(FORWARD);
-//                         timesToFW = (rand()%STRAIGHT_RAND_TIME) + 1;
-//                     }
-//                     break;
-//                 case FORWARD:
-//                     LOG_INF("Moving forward");
-//                     if( current_motion_time - last_motion_update >= timesToFW  ) {
-//                         last_motion_update = current_motion_time;
-//                         if( rand()%2 ) {
-//                             set_motion(ROTATE_CW);
-//                         }
-//                         else {
-//                             set_motion(ROTATE_CCW);
-//                         }
-//                         timesToTurn = (rand()%ROTATE_RAND_TIME) + 1;
-//                     }
-//                     break;
-//                 case STOP:
-
-//                 default:
-//                     set_motion(STOP);
-//             }
-//             k_msleep(10);
-
-//         }
-//         else{
-//             set_motion(STOP);
-//         }
-//         k_msleep(10);
-//     }
-    
-// }
-
-// K_THREAD_DEFINE(ble_motor_control_id, STACKSIZE, ble_motor_control, NULL, NULL,
-// 		NULL, MOVE_PRIORITY, 0, 0);                          
-
 
 void set_motion(motion_t motion){
     LOG_INF("Am setting motion : %d", motion);
