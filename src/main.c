@@ -121,6 +121,8 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
 
 void clear_buffer(uint8_t *buffer, size_t size);
 
+float convert_to_float(uint8_t *data, uint8_t len);
+
 // **********************************************************
 // FreeBot motion control
 // **********************************************************
@@ -309,8 +311,6 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     msg_received.len = len;
     uint32_t volt_delay;
 
-    clear_buffer(msg_received.data, sizeof(msg_received.data));
-
     memcpy(msg_received.data, data, len);
 
     // check the first byte of the message
@@ -341,20 +341,24 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
         case 0x65:
             LOG_INF("Information received");
             // print the received data,
-            for (uint16_t i = 1; i < 8; i++) {
+            for (uint16_t i = 1; i < len ; i++) {
                 LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
             }
          
-            uint8_t x_coordinate [8]={0};
+            uint8_t x_coordinate [8]={NULL};
+            uint8_t x_len = 8;
             memcpy(&x_coordinate, &msg_received.data[1],8);
-            
-            // Log each byte individually
-            for (int i = 0; i < 8; i++) {
-                LOG_INF("X coordinate byte %d: 0x%02x", i, x_coordinate[i]);
-            }
+            LOG_INF("Received x coordinate: %f\n", convert_to_float(x_coordinate, x_len));
 
-            // If x_coordinate represents a string, log it as a string
-            LOG_INF("X coordinate as string: %s", x_coordinate);
+            uint8_t y_coordinate [8]={NULL};
+            uint8_t y_len = 8;
+            memcpy(&y_coordinate, &msg_received.data[9],8);
+            LOG_INF("Received y coordinate: %f\n", convert_to_float(y_coordinate, y_len));
+
+            uint8_t angle[9]={NULL};
+            uint8_t angle_len = 9;
+            memcpy(&angle, &msg_received.data[17],9);
+            LOG_INF("Received angle: %f\n", convert_to_float(angle, angle_len));
 
             break;
 
@@ -363,7 +367,27 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
             break;
         
     }
+    clear_buffer(msg_received.data, sizeof(msg_received.data));
     return 0;
+
+}
+
+// create a function that takes the uint8 values of the coordinates and  converts them into a single float value
+// **********************************************************
+
+float convert_to_float(uint8_t *data, uint8_t len){
+    
+    char str[len+1];
+    for (int i = 0; i < len; i++) {
+        str[i] = (char)data[i];
+    }
+
+    str[len] = '\0';
+    printf("string to convert: %s\n", str);
+
+    float value = strtof(str, NULL);
+    printf("converted value: %f\n", value);
+    return value;
 
 }
 
@@ -527,12 +551,12 @@ void ble_write_thread(void)
         int v_current = fb_v_measure();
         uint8_t volt_cur_cal=(v_current*100)/3000;
 
-        if (volt_cur_cal <= 20){
-            uint8_t help[]={'99f1a'}; // array of characters 
-            if (bt_nus_send(NULL, help, sizeof(help))) {
-                LOG_WRN("Failed to send data over BLE connection");
-            }
-        }
+        // if (volt_cur_cal <= 20){
+        //     uint8_t help[]={'99f1a'}; // array of characters 
+        //     if (bt_nus_send(NULL, help, sizeof(help))) {
+        //         LOG_WRN("Failed to send data over BLE connection");
+        //     }
+        // }
         
         if (voltage_send){
 
