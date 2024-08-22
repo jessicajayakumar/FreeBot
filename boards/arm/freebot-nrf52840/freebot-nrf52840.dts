@@ -73,6 +73,10 @@
     };
 };
 
+&uicr {
+    nfct-pins-as-gpios;
+};
+
 &gpiote {
     status = "okay";
 };
@@ -196,9 +200,9 @@
 	status = "disabled";
 };
 
-// &cryptocell {
-// 	status = "disabled";
-// };
+&cryptocell {
+	status = "okay";
+};
 
 &ecb {
 	status = "disabled";
