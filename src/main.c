@@ -168,6 +168,11 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
     current_conn = bt_conn_ref(conn); // Reference the current connection to keep it active
 
+    // Send the FB ID to the connected device
+    uint8_t id_msg[] = {FB_ID}; // FreeBot ID
+    size_t id_msg_len = sizeof(id_msg); // Length of the ID message
+    bt_nus_send(current_conn, id_msg, id_msg_len); // Send the ID message to the connected device
+
     connection_made=true;
 
     fb_set_led(LED1); // Turn on the connection status LED
@@ -334,7 +339,7 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
             break;
 
         case 0x64:
-            LOG_INF("Voltage send stop received");
+            LOG_INF("Voltage send start received");
             voltage_send = true;
             break;
 
@@ -359,7 +364,6 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
             uint8_t angle_len = 9;
             memcpy(&angle, &msg_received.data[17],9);
             LOG_INF("Received angle: %f\n", convert_to_float(angle, angle_len));
-
             break;
 
         case 0x66:
