@@ -106,7 +106,7 @@ static const struct bt_data sd[] = {
 
 
 static bool data_received = false; // Flag to indicate if data has been received
-static bool voltage_send = true; // Flag to indicate if voltage should be sent
+static bool voltage_send = false; // Flag to indicate if voltage should be sent
 static bool move = false; // Flag to indicate if the FreeBot should move
 
 static bool connection_made = false; // Flag to indicate if a connection is established
@@ -147,7 +147,7 @@ void set_motion(motion_t motion);
 // ***************************************************************************************************
 // FreeBot ID - Change this to the ID of your FreeBot, and change the name in the prj.conf file
 // ***************************************************************************************************
-uint8_t FB_ID = 0x31; // hex for char 
+uint8_t FB_ID = 0x33; // hex for char 
 
 // **********************************************************
 // BLE Connection and configuration
@@ -168,15 +168,10 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
     current_conn = bt_conn_ref(conn); // Reference the current connection to keep it active
 
-    // Send the FB ID to the connected device
-    uint8_t id_msg[] = {FB_ID}; // FreeBot ID
-    size_t id_msg_len = sizeof(id_msg); // Length of the ID message
-    bt_nus_send(current_conn, id_msg, id_msg_len); // Send the ID message to the connected device
-
     connection_made=true;
 
     fb_set_led(LED1); // Turn on the connection status LED
-}
+ }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
@@ -212,6 +207,8 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
         LOG_WRN("Security failed: %s level %u err %d", addr,
             level, err); // Log the security failure with the address, level, and error
     }
+
+
 }
 #endif
 
@@ -497,6 +494,13 @@ int main(void)
 
     set_motion(FORWARD);
     move = false;
+
+    k_sleep(K_MSEC(1000));
+    // Send the FB ID to the connected device
+    uint8_t id_msg[] = {'*',FB_ID}; // FreeBot ID
+    size_t id_msg_len = sizeof(id_msg); // Length of the ID message
+    bt_nus_send(current_conn, id_msg, id_msg_len); // Send the ID message to the connected device
+    LOG_INF("Sent ID to connected device"); // Log that the ID was sent to the connected device
 
     for (;;) {
         fb_set_led(LED2); // Toggle the status LED
