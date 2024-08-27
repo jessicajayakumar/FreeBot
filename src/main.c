@@ -360,51 +360,44 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
         // print the received data,
         for (uint16_t i = 1; i < len; i++)
         {
-            LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
-        }
+            // LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
+            LOG_INF("%c", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
+        }        
 
-        uint8_t x_coordinate[8] = {NULL};
-        uint8_t x_len = 8;
-        memcpy(&x_coordinate, &msg_received.data[1], 8);
-        LOG_INF("Received x coordinate: %f\n", convert_to_float(x_coordinate, x_len));
+        LOG_INF("message len = %d", len);
 
-        uint8_t y_coordinate[8] = {NULL};
-        uint8_t y_len = 8;
-        memcpy(&y_coordinate, &msg_received.data[9], 8);
-        LOG_INF("Received y coordinate: %f\n", convert_to_float(y_coordinate, y_len));
+        /* Drop 'e' from message */
+        char *token;
+        uint16_t token_len;
+        token = strtok(msg_received.data, "e");
+        LOG_INF("Token: %s\n", token);
 
-        uint8_t angle[9] = {NULL};
-        uint8_t angle_len = 9;
-        memcpy(&angle, &msg_received.data[17], 9);
-        LOG_INF("Received angle: %f\n", convert_to_float(angle, angle_len));
+        double x_coord, y_coord, angle;
+
+        /* Split the received data according to the ',' character */ 
+        /* x-coordinate */
+        token = strtok(token, ",");
+        x_coord = strtod(token, NULL);
+        LOG_INF("Received x coordinate: %f\n", x_coord);
+
+        /* y-coordinate */
+        token = strtok(NULL, ",");
+        y_coord = strtod(token, NULL);
+        LOG_INF("Received y coordinate: %f\n", y_coord);
+
+        /* orientation */
+        token = strtok(NULL, ",");
+        angle = strtod(token, NULL);
+        LOG_INF("Received angle: %f\n", angle);
+
         break;
 
-    case 0x66:
+    case 'f':
         LOG_INF("Message from peer received");
         break;
     }
     clear_buffer(msg_received.data, sizeof(msg_received.data));
     return 0;
-}
-
-// create a function that takes the uint8 values of the coordinates and  converts them into a single float value
-// **********************************************************
-
-float convert_to_float(uint8_t *data, uint8_t len)
-{
-
-    char str[len + 1];
-    for (int i = 0; i < len; i++)
-    {
-        str[i] = (char)data[i];
-    }
-
-    str[len] = '\0';
-    printf("string to convert: %s\n", str);
-
-    float value = strtof(str, NULL);
-    printf("converted value: %f\n", value);
-    return value;
 }
 
 static struct bt_nus_cb nus_cb = {
