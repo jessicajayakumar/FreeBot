@@ -39,7 +39,8 @@
 
 #include <zephyr/logging/log.h> // Include Zephyr logging APIs
 
-#include "freebot.h" // Include FreeBot header file that includes the various FreeBot modules
+#include "freebot.h"     // Include FreeBot header file that includes the various FreeBot modules
+#include "generic_mic.h" // Inlcude SCT header file that manages the controller logic
 
 //********************************************************************************
 // Defining macros
@@ -106,6 +107,7 @@ static const struct bt_data sd[] = {
 
 static bool data_received = false; // Flag to indicate if data has been received
 static bool voltage_send = false;  // Flag to indicate if voltage should be sent
+static bool move_received = false; // Flag to indicate if move command has been received
 static bool move = false;          // Flag to indicate if the FreeBot should move
 
 static bool connection_made = false; // Flag to indicate if a connection is established
@@ -147,6 +149,18 @@ void set_motion(motion_t motion);
 // FreeBot ID - Change this to the ID of your FreeBot, and change the name in the prj.conf file
 // ***************************************************************************************************
 uint8_t FB_ID = 0x33; // hex for char
+
+// **********************************************************
+// SCT callback function declarations
+// **********************************************************
+
+/* Controllable events */
+void callback_move(void *data);
+void callback_stop(void *data);
+
+/* Uncontrollable events */
+unsigned char check_btnMove(void *data);
+unsigned char check_btnStop(void *data);
 
 // **********************************************************
 // BLE Connection and configuration
@@ -323,14 +337,12 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     {
     case 'a':
         LOG_INF("STOP received");
-        move = false;
-        set_motion(STOP);
+        move_received = false;
         break;
 
     case 'b':
         LOG_INF("START received");
-        move = true;
-        set_motion(FORWARD);
+        move_received = true;
         break;
 
     case 'c':
@@ -508,8 +520,12 @@ int main(void)
         return 0;                                             // Exit the program
     }
 
-    set_motion(FORWARD);
-    move = false;
+    /* SCT: add callback functions */
+    SCT_init();
+    SCT_add_callback(EV_move, callback_move, NULL, NULL);
+    SCT_add_callback(EV_stop, callback_stop, NULL, NULL);
+    SCT_add_callback(EV_btnMove, NULL, check_btnMove, NULL);
+    SCT_add_callback(EV_btnStop, NULL, check_btnStop, NULL);
 
     k_sleep(K_MSEC(1000));
     // Send the FB ID to the connected device
@@ -525,7 +541,11 @@ int main(void)
 
         fb_set_led(LED2); // Toggle the status LED
         // k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL)); // Sleep for the blink interval
-        k_sleep(K_MSEC(1000));
+
+        /* SCT: execute to trigger action if possible */
+        SCT_run_step();
+
+        k_sleep(K_MSEC(1000)); // Sleep for 1000 milliseconds
 
         LOG_INF("Current motion: %d", current_motion);
 
@@ -546,6 +566,7 @@ int main(void)
                     timesToFW = (rand() % STRAIGHT_RAND_TIME) + 1;
                 }
                 break;
+
             case FORWARD:
                 LOG_INF("Moving forward");
                 if (current_time - last_motion_update >= timesToFW)
@@ -562,11 +583,16 @@ int main(void)
                     timesToTurn = (rand() % ROTATE_RAND_TIME) + 1;
                 }
                 break;
-            case STOP:
 
+            case STOP:
             default:
-                set_motion(STOP);
+                LOG_INF("ERROR: Invalid motion");
             }
+        }
+        else
+        {
+            set_motion(STOP);
+            LOG_INF("Stopped");
         }
     }
     return 0;
@@ -691,3 +717,36 @@ void ble_write_thread(void)
 
 K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
                 NULL, VOLT_PRIORITY, 0, 0);
+
+// **********************************************************
+// SCT callback functions
+// **********************************************************
+
+/* Controllable events */
+
+void callback_move(void *data)
+{
+    LOG_INF("Callback move");
+    move = true;
+    current_motion = FORWARD;
+}
+
+void callback_stop(void *data)
+{
+    LOG_INF("Callback stop");
+    move = false;
+}
+
+/* Uncontrollable events */
+
+unsigned char check_btnMove(void *data)
+{
+    LOG_INF("Check btnMove %d", move_received);
+    return move_received;
+}
+
+unsigned char check_btnStop(void *data)
+{
+    LOG_INF("Check btnStop %d", !move_received);
+    return !move_received;
+}
