@@ -12,6 +12,10 @@ else()
     target_sources(app PRIVATE lib/freebot/src/fb_motor.c lib/freebot/src/fb_io.c lib/freebot/src/fb_pwr.c)
 endif()
 
+# SCT sources
+include_directories(lib/sct/inc)
+target_sources(app PRIVATE lib/sct/src/generic_mic.c)
+
 # Main application source
 target_sources(app PRIVATE src/main.c)
 
