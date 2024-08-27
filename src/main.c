@@ -121,8 +121,6 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
 
 void clear_buffer(uint8_t *buffer, size_t size);
 
-float convert_to_float(uint8_t *data, uint8_t len);
-
 // **********************************************************
 // FreeBot motion control
 // **********************************************************
@@ -142,6 +140,8 @@ uint32_t timesToFW = 0;
 
 uint32_t STRAIGHT_RAND_TIME = 5000;
 uint32_t ROTATE_RAND_TIME = 1000;
+
+double x_coord, y_coord, angle;
 
 void set_motion(motion_t motion);
 
@@ -356,39 +356,37 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
         break;
 
     case 'e':
-        LOG_INF("Information received");
-        // print the received data,
-        for (uint16_t i = 1; i < len; i++)
-        {
-            // LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
-            LOG_INF("%c", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
-        }        
+        // LOG_INF("Information received");
+        // /* print the received data */
+        // for (uint16_t i = 1; i < len; i++)
+        // {
+        //     // LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
+        //     LOG_INF("%c", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
+        // }        
 
-        LOG_INF("message len = %d", len);
+        // LOG_INF("message len = %d", len);
 
         /* Drop 'e' from message */
         char *token;
         uint16_t token_len;
         token = strtok(msg_received.data, "e");
-        LOG_INF("Token: %s\n", token);
-
-        double x_coord, y_coord, angle;
+        // LOG_INF("Token: %s\n", token);
 
         /* Split the received data according to the ',' character */ 
         /* x-coordinate */
         token = strtok(token, ",");
         x_coord = strtod(token, NULL);
-        LOG_INF("Received x coordinate: %f\n", x_coord);
+        LOG_INF("Received x coordinate: %f", x_coord);
 
         /* y-coordinate */
         token = strtok(NULL, ",");
         y_coord = strtod(token, NULL);
-        LOG_INF("Received y coordinate: %f\n", y_coord);
+        LOG_INF("Received y coordinate: %f", y_coord);
 
         /* orientation */
         token = strtok(NULL, ",");
         angle = strtod(token, NULL);
-        LOG_INF("Received angle: %f\n", angle);
+        LOG_INF("Received angle: %f", angle);
 
         break;
 
