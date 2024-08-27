@@ -316,31 +316,31 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
     memcpy(msg_received.data, data, len);
 
     // check the first byte of the message
-    switch (msg_received.data[0])
+    switch ((char)msg_received.data[0]) // cast the first byte of the message to a character
     {
-        case 0x61:
+        case 'a':
             LOG_INF("STOP received");
             move = false;
             set_motion(STOP);
             break;
         
-        case 0x62:
+        case 'b':
             LOG_INF("START received");
             move = true;
             set_motion(FORWARD);
             break;
 
-        case 0x63:
+        case 'c':
             LOG_INF("Voltage send stop received");
             voltage_send = false;
             break;
 
-        case 0x64:
+        case 'd':
             LOG_INF("Voltage send start received");
             voltage_send = true;
             break;
 
-        case 0x65:
+        case 'e':
             LOG_INF("Information received");
             // print the received data,
             for (uint16_t i = 1; i < len ; i++) {
@@ -500,17 +500,57 @@ int main(void)
     uint8_t id_msg[] = {'*',FB_ID}; // FreeBot ID
     size_t id_msg_len = sizeof(id_msg); // Length of the ID message
     bt_nus_send(current_conn, id_msg, id_msg_len); // Send the ID message to the connected device
-    LOG_INF("Sent ID to connected device"); // Log that the ID was sent to the connected device
+    LOG_INF("Sent ID (%d) to connected device", FB_ID); // Log that the ID was sent to the connected device
 
     for (;;) {
+
+        uint32_t current_time = k_uptime_get_32();
+
         fb_set_led(LED2); // Toggle the status LED
-        k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL)); // Sleep for the blink interval
+        // k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL)); // Sleep for the blink interval
+        k_sleep(K_MSEC(1000));
+
+        LOG_INF("Current motion: %d", current_motion);
+
+        if (move){
+            
+            LOG_INF("Moving, current motion: %d", current_motion);
+
+            switch( current_motion ) {
+                case ROTATE_CW:
+                case ROTATE_CCW:
+                    LOG_INF("Rotating, CCW");
+                    if( current_time - last_motion_update  >= timesToTurn ) {
+                        last_motion_update = current_time;
+                        set_motion(FORWARD);
+                        timesToFW = (rand()%STRAIGHT_RAND_TIME) + 1;
+                    }
+                    break;
+                case FORWARD:
+                    LOG_INF("Moving forward");
+                    if( current_time - last_motion_update >= timesToFW  ) {
+                        last_motion_update = current_time;
+                        if( rand()%2 ) {
+                            set_motion(ROTATE_CW);
+                        }
+                        else {
+                            set_motion(ROTATE_CCW);
+                        }
+                        timesToTurn = (rand()%ROTATE_RAND_TIME) + 1;
+                    }
+                    break;
+                case STOP:
+
+                default:
+                    set_motion(STOP);
+            }
+        }
     }
     return 0; 
 }
 
 // **********************************************************
-// BLE voltage measurement and movement thread
+// BLE voltage measurement thread
 // **********************************************************
 
 void set_motion(motion_t motion){
@@ -610,46 +650,9 @@ void ble_write_thread(void)
             
             }
         }
-
-
-        if (move){
-            
-            LOG_INF("Moving, current motion: %d", current_motion);
-
-
-            switch( current_motion ) {
-                case ROTATE_CW:
-                case ROTATE_CCW:
-                    LOG_INF("Rotating, CCW");
-                    if( current_time - last_motion_update  >= timesToTurn ) {
-                        last_motion_update = current_time;
-                        set_motion(FORWARD);
-                        timesToFW = (rand()%STRAIGHT_RAND_TIME) + 1;
-                    }
-                    break;
-                case FORWARD:
-                    LOG_INF("Moving forward");
-                    if( current_time - last_motion_update >= timesToFW  ) {
-                        last_motion_update = current_time;
-                        if( rand()%2 ) {
-                            set_motion(ROTATE_CW);
-                        }
-                        else {
-                            set_motion(ROTATE_CCW);
-                        }
-                        timesToTurn = (rand()%ROTATE_RAND_TIME) + 1;
-                    }
-                    break;
-                case STOP:
-
-                default:
-                    set_motion(STOP);
-            }
-
-        }
         
-        // // Short sleep to prevent busy-waiting and allow other threads to run
-            k_msleep(10);
+        // Short sleep to prevent busy-waiting and allow other threads to run
+        k_msleep(10);
 
     }
     
