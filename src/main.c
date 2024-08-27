@@ -536,14 +536,12 @@ int main(void)
         /* SCT: execute to trigger action if possible */
         SCT_run_step();
 
-        k_sleep(K_MSEC(1000)); // Sleep for 1000 milliseconds
-
         LOG_INF("Current motion: %d", current_motion);
 
         if (move)
         {
 
-            LOG_INF("Moving, current motion: %d", current_motion);
+            // LOG_INF("Moving, current motion: %d", current_motion);
 
             switch (current_motion)
             {
@@ -583,8 +581,10 @@ int main(void)
         else
         {
             set_motion(STOP);
-            LOG_INF("Stopped");
+            // LOG_INF("Stopped");
         }
+
+        k_sleep(K_MSEC(100)); // Sleep for 100 milliseconds
     }
     return 0;
 }
@@ -595,7 +595,7 @@ int main(void)
 
 void set_motion(motion_t motion)
 {
-    LOG_INF("Am setting motion : %d", motion);
+    // LOG_INF("Am setting motion : %d", motion);
     if (current_motion != motion)
     {
         current_motion = motion;
@@ -732,12 +732,12 @@ void callback_stop(void *data)
 
 unsigned char check_btnMove(void *data)
 {
-    LOG_INF("Check btnMove %d", move_received);
+    // LOG_INF("Check btnMove %d", move_received);
     return move_received;
 }
 
 unsigned char check_btnStop(void *data)
 {
-    LOG_INF("Check btnStop %d", !move_received);
+    // LOG_INF("Check btnStop %d", !move_received);
     return !move_received;
 }
