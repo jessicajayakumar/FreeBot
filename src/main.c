@@ -150,6 +150,12 @@ uint32_t ROTATE_RAND_TIME = 1000;
 
 double x_coord, y_coord, angle;
 
+/* Work and Charge: arena regions */
+const double x_work = 1.94;
+const double x_charge = 0.63;
+const double y_lower = 0.5;
+const double y_upper = 0.8;
+
 void set_motion(motion_t motion);
 
 // ***************************************************************************************************
@@ -578,18 +584,18 @@ int main(void)
 
             if(direction == 'w') {
                 // check y_coord and move accordingly
-                if(y_coord < 0.4) {
+                if(y_coord < y_lower) {
                     set_motion(RIGHT_FRONT);
-                } else if(y_coord > 0.6) {
+                } else if(y_coord > y_upper) {
                     set_motion(LEFT_FRONT);
                 } else {
                     set_motion(FORWARD);
                 }
             } else if (direction == 'c') {
                 // check x_coord and move accordingly
-                if(y_coord < 0.4) {
+                if(y_coord < y_lower) {
                     set_motion(RIGHT_BACK);
-                } else if(y_coord > 0.6) {
+                } else if(y_coord > y_upper) {
                     set_motion(LEFT_BACK);
                 } else {
                     set_motion(BACKWARD);
@@ -822,7 +828,7 @@ void callback_charge(void *data)
 unsigned char check_atWork(void *data)
 {
     // LOG_INF("Check btnMove %d", move_received);
-    bool atWork = (x_coord > 1) ? true : false;
+    bool atWork = (x_coord > x_work) ? true : false;
     if (atWork)
     {
         LOG_INF("EVENT: atWork");
@@ -833,7 +839,7 @@ unsigned char check_atWork(void *data)
 unsigned char check_notAtWork(void *data)
 {
     // LOG_INF("Check btnStop %d", !move_received);
-    bool atWork = (x_coord > 1) ? true : false;
+    bool atWork = (x_coord > x_work) ? true : false;
     if (!atWork)
     {
         LOG_INF("EVENT: notAtWork");
@@ -844,7 +850,7 @@ unsigned char check_notAtWork(void *data)
 unsigned char check_atCharger(void *data)
 {
     // LOG_INF("Check btnMove %d", move_received);
-    bool atCharger = (x_coord < 0.5) ? true : false;
+    bool atCharger = (x_coord < x_charge) ? true : false;
     if (atCharger)
     {
         LOG_INF("EVENT: atCharger");
@@ -855,7 +861,7 @@ unsigned char check_atCharger(void *data)
 unsigned char check_notAtCharger(void *data)
 {
     // LOG_INF("Check btnStop %d", !move_received);
-    bool atCharger = (x_coord < 0.5) ? true : false;
+    bool atCharger = (x_coord < x_charge) ? true : false;
     if (!atCharger)
     {
         LOG_INF("EVENT: notAtCharger");
