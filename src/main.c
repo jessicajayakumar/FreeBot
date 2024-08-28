@@ -39,8 +39,9 @@
 
 #include <zephyr/logging/log.h> // Include Zephyr logging APIs
 
-#include "freebot.h"     // Include FreeBot header file that includes the various FreeBot modules
-#include "generic_mic.h" // Inlcude SCT header file that manages the controller logic
+#include "freebot.h" // Include FreeBot header file that includes the various FreeBot modules
+// #include "generic_mic.h" // Inlcude SCT header file that manages the controller logic
+#include "sct_work_and_charge.h" // Inlcude SCT header file that manages the controller logic
 
 //********************************************************************************
 // Defining macros
@@ -109,6 +110,7 @@ static bool data_received = false; // Flag to indicate if data has been received
 static bool voltage_send = false;  // Flag to indicate if voltage should be sent
 static bool move_received = false; // Flag to indicate if move command has been received
 static bool move = false;          // Flag to indicate if the FreeBot should move
+static char direction = 'w';       // char to indicate the direction of the FreeBot (w: work, c: charge)
 
 static bool connection_made = false; // Flag to indicate if a connection is established
 
@@ -129,8 +131,13 @@ typedef enum
 {
     STOP = 0,
     FORWARD,
+    BACKWARD,
     ROTATE_CW,
     ROTATE_CCW,
+    LEFT_FRONT,
+    RIGHT_FRONT,
+    LEFT_BACK,
+    RIGHT_BACK,
 } motion_t;
 
 motion_t current_motion = STOP;
@@ -154,13 +161,27 @@ uint8_t FB_ID = 0x33; // hex for char
 // SCT callback function declarations
 // **********************************************************
 
+/* Random motion */
+// /* Controllable events */
+// void callback_move(void *data);
+// void callback_stop(void *data);
+
+// /* Uncontrollable events */
+// unsigned char check_btnMove(void *data);
+// unsigned char check_btnStop(void *data);
+
+/* Work and Charge */
 /* Controllable events */
-void callback_move(void *data);
-void callback_stop(void *data);
+void callback_moveToWork(void *data);
+void callback_moveToCharge(void *data);
+void callback_work(void *data);
+void callback_charge(void *data);
 
 /* Uncontrollable events */
-unsigned char check_btnMove(void *data);
-unsigned char check_btnStop(void *data);
+unsigned char check_atWork(void *data);
+unsigned char check_notAtWork(void *data);
+unsigned char check_atCharger(void *data);
+unsigned char check_notAtCharger(void *data);
 
 // **********************************************************
 // BLE Connection and configuration
@@ -362,7 +383,7 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
         // {
         //     // LOG_INF("0x%02x ", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
         //     LOG_INF("%c", msg_received.data[i]); // Log each byte of the received data in hexadecimal format
-        // }        
+        // }
 
         // LOG_INF("message len = %d", len);
 
@@ -372,7 +393,7 @@ int handle_msg(struct bt_conn *conn, const uint8_t *const data,
         token = strtok(msg_received.data, "e");
         // LOG_INF("Token: %s\n", token);
 
-        /* Split the received data according to the ',' character */ 
+        /* Split the received data according to the ',' character */
         /* x-coordinate */
         token = strtok(token, ",");
         x_coord = strtod(token, NULL);
@@ -513,10 +534,22 @@ int main(void)
 
     /* SCT: add callback functions */
     SCT_init();
-    SCT_add_callback(EV_move, callback_move, NULL, NULL);
-    SCT_add_callback(EV_stop, callback_stop, NULL, NULL);
-    SCT_add_callback(EV_btnMove, NULL, check_btnMove, NULL);
-    SCT_add_callback(EV_btnStop, NULL, check_btnStop, NULL);
+
+    /* Random motion */
+    // SCT_add_callback(EV_move, callback_move, NULL, NULL);
+    // SCT_add_callback(EV_stop, callback_stop, NULL, NULL);
+    // SCT_add_callback(EV_btnMove, NULL, check_btnMove, NULL);
+    // SCT_add_callback(EV_btnStop, NULL, check_btnStop, NULL);
+
+    /* Work and Charge */
+    SCT_add_callback(EV_moveToWork, callback_moveToWork, NULL, NULL);
+    SCT_add_callback(EV_moveToCharge, callback_moveToCharge, NULL, NULL);
+    SCT_add_callback(EV_work, callback_work, NULL, NULL);
+    SCT_add_callback(EV_charge, callback_charge, NULL, NULL);
+    SCT_add_callback(EV_atWork, NULL, check_atWork, NULL);
+    SCT_add_callback(EV_notAtWork, NULL, check_notAtWork, NULL);
+    SCT_add_callback(EV_atCharger, NULL, check_atCharger, NULL);
+    SCT_add_callback(EV_notAtCharger, NULL, check_notAtCharger, NULL);
 
     k_sleep(K_MSEC(1000));
     // Send the FB ID to the connected device
@@ -543,40 +576,28 @@ int main(void)
 
             // LOG_INF("Moving, current motion: %d", current_motion);
 
-            switch (current_motion)
-            {
-            case ROTATE_CW:
-            case ROTATE_CCW:
-                LOG_INF("Rotating, CCW");
-                if (current_time - last_motion_update >= timesToTurn)
-                {
-                    last_motion_update = current_time;
+            if(direction == 'w') {
+                // check y_coord and move accordingly
+                if(y_coord < 0.4) {
+                    set_motion(RIGHT_FRONT);
+                } else if(y_coord > 0.6) {
+                    set_motion(LEFT_FRONT);
+                } else {
                     set_motion(FORWARD);
-                    timesToFW = (rand() % STRAIGHT_RAND_TIME) + 1;
                 }
-                break;
-
-            case FORWARD:
-                LOG_INF("Moving forward");
-                if (current_time - last_motion_update >= timesToFW)
-                {
-                    last_motion_update = current_time;
-                    if (rand() % 2)
-                    {
-                        set_motion(ROTATE_CW);
-                    }
-                    else
-                    {
-                        set_motion(ROTATE_CCW);
-                    }
-                    timesToTurn = (rand() % ROTATE_RAND_TIME) + 1;
+            } else if (direction == 'c') {
+                // check x_coord and move accordingly
+                if(y_coord < 0.4) {
+                    set_motion(RIGHT_BACK);
+                } else if(y_coord > 0.6) {
+                    set_motion(LEFT_BACK);
+                } else {
+                    set_motion(BACKWARD);
                 }
-                break;
-
-            case STOP:
-            default:
-                LOG_INF("ERROR: Invalid motion");
+            } else {
+                LOG_INF("Invalid direction");
             }
+            
         }
         else
         {
@@ -608,6 +629,10 @@ void set_motion(motion_t motion)
         {
             fb_straight_forw();
         }
+        else if (current_motion == BACKWARD)
+        {
+            fb_straight_back();
+        }
         else if (current_motion == ROTATE_CW)
         {
             fb_rotate_cw();
@@ -615,6 +640,22 @@ void set_motion(motion_t motion)
         else if (current_motion == ROTATE_CCW)
         {
             fb_rotate_ccw();
+        }
+        else if (current_motion == LEFT_FRONT)
+        {
+            fb_side_d315();
+        }
+        else if (current_motion == RIGHT_FRONT)
+        {
+            fb_side_d45();
+        }
+        else if (current_motion == LEFT_BACK)
+        {
+            fb_side_d225();
+        }
+        else if (current_motion == RIGHT_BACK)
+        {
+            fb_side_d135();
         }
     }
     else
@@ -713,31 +754,111 @@ K_THREAD_DEFINE(ble_write_thread_id, STACKSIZE, ble_write_thread, NULL, NULL,
 // SCT callback functions
 // **********************************************************
 
+/* Random motion */
+
+// /* Controllable events */
+
+// void callback_move(void *data)
+// {
+//     LOG_INF("Callback move");
+//     move = true;
+//     current_motion = FORWARD;
+// }
+
+// void callback_stop(void *data)
+// {
+//     LOG_INF("Callback stop");
+//     move = false;
+// }
+
+// /* Uncontrollable events */
+
+// unsigned char check_btnMove(void *data)
+// {
+//     // LOG_INF("Check btnMove %d", move_received);
+//     return move_received;
+// }
+
+// unsigned char check_btnStop(void *data)
+// {
+//     // LOG_INF("Check btnStop %d", !move_received);
+//     return !move_received;
+// }
+
+/* Work and Charge */
+
 /* Controllable events */
 
-void callback_move(void *data)
+void callback_moveToWork(void *data)
 {
-    LOG_INF("Callback move");
+    LOG_INF("ACTION: moveToWork");
     move = true;
-    current_motion = FORWARD;
+    direction = 'w';
+    // current_motion = FORWARD;
 }
 
-void callback_stop(void *data)
+void callback_moveToCharge(void *data)
 {
-    LOG_INF("Callback stop");
+    LOG_INF("ACTION: moveToCharge");
+    move = true;
+    direction = 'c';
+    // current_motion = BACKWARD;
+}
+
+void callback_work(void *data)
+{
+    LOG_INF("ACTION: work");
+    move = false;
+}
+
+void callback_charge(void *data)
+{
+    LOG_INF("ACTION: charge");
     move = false;
 }
 
 /* Uncontrollable events */
 
-unsigned char check_btnMove(void *data)
+unsigned char check_atWork(void *data)
 {
     // LOG_INF("Check btnMove %d", move_received);
-    return move_received;
+    bool atWork = (x_coord > 1) ? true : false;
+    if (atWork)
+    {
+        LOG_INF("EVENT: atWork");
+    }
+    return atWork;
 }
 
-unsigned char check_btnStop(void *data)
+unsigned char check_notAtWork(void *data)
 {
     // LOG_INF("Check btnStop %d", !move_received);
-    return !move_received;
+    bool atWork = (x_coord > 1) ? true : false;
+    if (!atWork)
+    {
+        LOG_INF("EVENT: notAtWork");
+    }
+    return !atWork;
+}
+
+unsigned char check_atCharger(void *data)
+{
+    // LOG_INF("Check btnMove %d", move_received);
+    bool atCharger = (x_coord < 0.5) ? true : false;
+    if (atCharger)
+    {
+        LOG_INF("EVENT: atCharger");
+    }
+    return atCharger;
+}
+
+unsigned char check_notAtCharger(void *data)
+{
+    // LOG_INF("Check btnStop %d", !move_received);
+    bool atCharger = (x_coord < 0.5) ? true : false;
+    if (!atCharger)
+    {
+        LOG_INF("EVENT: notAtCharger");
+    }
+    return !atCharger;
 }

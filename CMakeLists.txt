@@ -14,7 +14,8 @@ endif()
 
 # SCT sources
 include_directories(lib/sct/inc)
-target_sources(app PRIVATE lib/sct/src/generic_mic.c)
+# target_sources(app PRIVATE lib/sct/src/generic_mic.c)
+target_sources(app PRIVATE lib/sct/src/sct_work_and_charge.c)
 
 # Main application source
 target_sources(app PRIVATE src/main.c)
