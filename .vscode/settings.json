@@ -22,6 +22,7 @@
         "hci.h": "c",
         "hci_types.h": "c",
         "addr.h": "c",
-        "nus.h": "c"
+        "nus.h": "c",
+        "fb_pwr.h": "c"
     }
 }
